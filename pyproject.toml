@@ -1,0 +1,10 @@
+[project]
+name = "image2test"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "openai>=1.0.0",
+    "python-docx>=1.2.0",
+]
