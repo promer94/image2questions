@@ -11,3 +11,5 @@ wheels/
 images
 
 *.jpg
+.env
+.env.*

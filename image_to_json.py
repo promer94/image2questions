@@ -8,7 +8,10 @@ import json
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
 from openai import OpenAI
+
+load_dotenv()
 from pydantic import BaseModel
 
 
@@ -29,7 +32,7 @@ class QuestionList(BaseModel):
 
 
 # 豆包模型配置
-DOUBAO_API_KEY = os.getenv("DOUBAO_API_KEY", "a871c6fc-c014-4451-9db5-125400419b25")
+DOUBAO_API_KEY = os.getenv("DOUBAO_API_KEY", "")
 DOUBAO_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
 # 豆包视觉模型 endpoint，需要替换为你的 endpoint id
 DOUBAO_MODEL = os.getenv("DOUBAO_MODEL", "doubao-seed-1-6-251015")

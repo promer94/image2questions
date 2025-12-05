@@ -12,7 +12,10 @@ import re
 from pathlib import Path
 from typing import Iterable
 
+from dotenv import load_dotenv
 from docx import Document
+
+load_dotenv()
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt
@@ -34,7 +37,7 @@ class TrueFalseList(BaseModel):
 
 # ==================== 豆包模型配置 ====================
 
-DOUBAO_API_KEY = os.getenv("DOUBAO_API_KEY", "a871c6fc-c014-4451-9db5-125400419b25")
+DOUBAO_API_KEY = os.getenv("DOUBAO_API_KEY", "")
 DOUBAO_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
 DOUBAO_MODEL = os.getenv("DOUBAO_MODEL", "doubao-seed-1-6-251015")
 
