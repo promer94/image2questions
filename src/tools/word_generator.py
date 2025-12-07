@@ -160,6 +160,86 @@ def build_true_false_tables(items: Iterable[dict], document: Document) -> int:
     return count
 
 
+# ==================== Section Management Helpers ====================
+
+MC_HEADER_TEXT = "一、选择题"
+TF_HEADER_TEXT = "二、判断题"
+
+def find_paragraph_by_text(document: Document, text: str):
+    """Find a paragraph containing specific text."""
+    for p in document.paragraphs:
+        if text in p.text:
+            return p
+    return None
+
+def move_elements_to_before(elements: list, target_paragraph) -> None:
+    """Move specified elements to before target_paragraph."""
+    if not target_paragraph:
+        return
+        
+    target_element = target_paragraph._element
+    for element in elements:
+        target_element.addprevious(element)
+
+def insert_questions_section(
+    document: Document,
+    questions: list[dict],
+    header_text: str,
+    next_header_text: str | None,
+    is_multiple_choice: bool,
+    use_table: bool = True
+) -> int:
+    """Insert questions into the correct section."""
+    header = find_paragraph_by_text(document, header_text)
+    next_header = find_paragraph_by_text(document, next_header_text) if next_header_text else None
+    
+    insertion_point = None
+    
+    if header:
+        # Header exists
+        if next_header:
+            insertion_point = next_header
+        else:
+            insertion_point = None
+    else:
+        # Header missing, create it
+        if next_header:
+            # Insert header before next_header
+            header = next_header.insert_paragraph_before()
+            run = header.add_run(header_text)
+            apply_yahei_font(run, 14)
+            run.bold = True
+            insertion_point = next_header
+        else:
+            # Append header
+            header = document.add_paragraph()
+            run = header.add_run(header_text)
+            apply_yahei_font(run, 14)
+            run.bold = True
+            insertion_point = None
+            
+    # Capture existing elements to identify new ones
+    existing_elements = list(document.element.body)
+    
+    # Generate questions
+    if is_multiple_choice:
+        count = build_multiple_choice_tables(questions, document)
+    else:
+        if use_table:
+            count = build_true_false_tables(questions, document)
+        else:
+            count = build_true_false_paragraphs(questions, document)
+        
+    # Identify new elements
+    new_elements = [e for e in document.element.body if e not in existing_elements]
+    
+    # Move elements if needed
+    if insertion_point:
+        move_elements_to_before(new_elements, insertion_point)
+        
+    return count
+
+
 # ==================== Main Generation Function ====================
 
 def generate_word_document(
@@ -193,14 +273,25 @@ def generate_word_document(
         
         # Build document based on question type
         if question_type == "multiple_choice":
-            count = build_multiple_choice_tables(questions, document)
+            count = insert_questions_section(
+                document, 
+                questions, 
+                MC_HEADER_TEXT, 
+                TF_HEADER_TEXT, 
+                is_multiple_choice=True
+            )
             remove_table_borders(document)
         else:  # true_false
+            count = insert_questions_section(
+                document, 
+                questions, 
+                TF_HEADER_TEXT, 
+                None, 
+                is_multiple_choice=False,
+                use_table=use_table
+            )
             if use_table:
-                count = build_true_false_tables(questions, document)
                 remove_table_borders(document)
-            else:
-                count = build_true_false_paragraphs(questions, document)
         
         # Save document
         document.save(output_path)
@@ -357,23 +448,24 @@ def _generate_mixed_word_document(
         
         # Add multiple choice questions first
         if mc_questions:
-            # Add section header
-            header = document.add_paragraph()
-            run = header.add_run("一、选择题")
-            apply_yahei_font(run, 14)
-            run.bold = True
-            
-            mc_count = build_multiple_choice_tables(mc_questions, document)
+            mc_count = insert_questions_section(
+                document, 
+                mc_questions, 
+                MC_HEADER_TEXT, 
+                TF_HEADER_TEXT, 
+                is_multiple_choice=True
+            )
         
         # Add true/false questions
         if tf_questions:
-            # Add section header
-            header = document.add_paragraph()
-            run = header.add_run("二、判断题")
-            apply_yahei_font(run, 14)
-            run.bold = True
-            
-            tf_count = build_true_false_tables(tf_questions, document)
+            tf_count = insert_questions_section(
+                document, 
+                tf_questions, 
+                TF_HEADER_TEXT, 
+                None, 
+                is_multiple_choice=False,
+                use_table=True
+            )
         
         # Remove all table borders
         remove_table_borders(document)
