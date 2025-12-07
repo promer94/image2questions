@@ -23,6 +23,8 @@ SYSTEM_PROMPT_ZH = """你是一个专业的试题提取助手。你的任务是�
 4. **save_questions_word** - 将试题保存为Word文档
    - 选择题使用表格格式
    - 判断题使用列表格式
+   - 选择题和判断题可以混合保存
+   - 支持追加模式或覆盖模式
 
 5. **validate_questions_tool** - 验证试题的完整性和质量
    - 检查题目是否为空
@@ -75,6 +77,8 @@ You can use the following tools to complete tasks:
 4. **save_questions_word** - Save questions to Word document
    - Multiple-choice questions use table format
    - True/false questions use list format
+   - Can mix multiple-choice and true/false questions
+   - Supports append or overwrite mode
 
 5. **validate_questions_tool** - Validate question completeness and quality
    - Check if title is empty
