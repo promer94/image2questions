@@ -138,10 +138,8 @@ def build_image_content(image_paths: list[str]) -> list[dict]:
         mime_type = get_image_mime_type(image_path)
         
         content.append({
-            "type": "image_url",
-            "image_url": {
-                "url": f"data:{mime_type};base64,{base64_image}"
-            }
+            "type": "input_image",
+            "image_url": f"data:{mime_type};base64,{base64_image}",
         })
     
     return content
@@ -210,7 +208,7 @@ def extract_true_false(llm: ChatOpenAI, image_paths: list[str]) -> dict:
 
 def extract_mixed(llm: ChatOpenAI, image_paths: list[str]) -> dict:
     """Extract both multiple choice and true/false questions from images using LangChain agent."""
-    content = [{"type": "text", "text": "请识别以下图片中的所有题目，包括选择题和判断题。"}]
+    content = [{"type": "input_text", "text": "请识别以下图片中的所有题目，包括选择题和判断题。"}]
     content.extend(build_image_content(image_paths))
     
     # Create agent with ProviderStrategy for native structured output
@@ -305,6 +303,7 @@ def analyze_image(
             model=settings.doubao_model,
             temperature=0.1,
             max_tokens=settings.doubao_max_tokens,
+            use_responses_api=True,
         )
         
         # Extract questions based on type
