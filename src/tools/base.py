@@ -1,0 +1,69 @@
+"""
+Base module for LangChain tools.
+
+This module provides shared utilities and base classes for all tools.
+"""
+
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+
+class ToolResult(BaseModel):
+    """Standard result format for tool operations."""
+    success: bool = Field(description="Whether the operation was successful")
+    message: str = Field(description="Human-readable message about the result")
+    data: dict[str, Any] = Field(default_factory=dict, description="Additional result data")
+    
+    def __str__(self) -> str:
+        """Return a string representation for the agent."""
+        if self.success:
+            result = f"✓ {self.message}"
+        else:
+            result = f"✗ {self.message}"
+        
+        if self.data:
+            result += f"\nData: {self.data}"
+        return result
+
+
+class ImageAnalysisResult(BaseModel):
+    """Result from image analysis tool."""
+    success: bool = Field(description="Whether analysis was successful")
+    question_count: int = Field(default=0, description="Number of questions extracted")
+    question_type: str = Field(default="", description="Type of questions (multiple_choice or true_false)")
+    questions: list[dict] = Field(default_factory=list, description="List of extracted questions")
+    source_images: list[str] = Field(default_factory=list, description="Source image paths")
+    error: str | None = Field(default=None, description="Error message if failed")
+
+
+class FileOperationResult(BaseModel):
+    """Result from file generation tools."""
+    success: bool = Field(description="Whether file operation was successful")
+    file_path: str = Field(default="", description="Path to the generated file")
+    items_processed: int = Field(default=0, description="Number of items processed")
+    message: str = Field(default="", description="Additional information")
+    error: str | None = Field(default=None, description="Error message if failed")
+
+
+class ValidationResult(BaseModel):
+    """Result from validation tool."""
+    success: bool = Field(description="Whether validation passed")
+    is_valid: bool = Field(description="Whether all questions are valid")
+    total_questions: int = Field(default=0, description="Total questions validated")
+    issues_count: int = Field(default=0, description="Number of issues found")
+    confidence_score: float = Field(default=1.0, description="Overall confidence (0-1)")
+    issues: list[dict] = Field(default_factory=list, description="List of validation issues")
+    error: str | None = Field(default=None, description="Error message if failed")
+
+
+class BatchProcessingResult(BaseModel):
+    """Result from batch processing tool."""
+    success: bool = Field(description="Whether batch processing was successful")
+    total_images: int = Field(default=0, description="Total images processed")
+    total_questions: int = Field(default=0, description="Total questions extracted")
+    successful_images: int = Field(default=0, description="Successfully processed images")
+    failed_images: int = Field(default=0, description="Failed images")
+    questions: list[dict] = Field(default_factory=list, description="All extracted questions")
+    errors: list[str] = Field(default_factory=list, description="Error messages from failed images")
+    error: str | None = Field(default=None, description="Overall error message if failed")

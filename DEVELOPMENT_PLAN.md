@@ -36,14 +36,14 @@ This document outlines the development plan for building a LangChain-based agent
 
 | Task | Description | Status |
 |------|-------------|--------|
-| 1.1 | Create `src/` directory structure per Appendix A |  |
-| 1.2 | Create Pydantic models in `src/models/questions.py` | |
-| 1.3 | Create configuration system in `src/models/config.py` |  |
-| 1.4 | Add `.env.example` file | |
-| 1.5 | Create utility modules (`image_utils.py`, `file_utils.py`) |  |
-| 1.6 | Update `pyproject.toml` with dependencies |  |
-| 1.7 | Create test scaffolding |  |
-| 1.8 | Create CLI placeholder | |
+| 1.1 | Create `src/` directory structure per Appendix A | ✅ |
+| 1.2 | Create Pydantic models in `src/models/questions.py` | ✅ |
+| 1.3 | Create configuration system in `src/models/config.py` | ✅ |
+| 1.4 | Add `.env.example` file | ✅ |
+| 1.5 | Create utility modules (`image_utils.py`, `file_utils.py`) | ✅ |
+| 1.6 | Update `pyproject.toml` with dependencies | ✅ |
+| 1.7 | Create test scaffolding | ✅ |
+| 1.8 | Create CLI placeholder | ✅ |
 
 ### Deliverables Created
 ```
@@ -75,16 +75,16 @@ tests/
 
 ---
 
-## Phase 2: LangChain Tools Implementation 
+## Phase 2: LangChain Tools Implementation ✅
 
 | Task | Description | Priority | Status |
 |------|-------------|----------|--------|
-| 2.1 | Create `ImageAnalysisTool` wrapping existing recognition logic | High |  |
-| 2.2 | Create `JSONGeneratorTool` with append mode support | High |  |
-| 2.3 | Create `WordGeneratorTool` for both question types | High |  |
-| 2.4 | Create `ValidationTool` with confidence scoring | Medium | |
-| 2.5 | Create `BatchProcessingTool` | Medium |  |
-| 2.6 | Write unit tests for all tools | High | |
+| 2.1 | Create `ImageAnalysisTool` wrapping existing recognition logic | High | ✅ |
+| 2.2 | Create `JSONGeneratorTool` with append mode support | High | ✅ |
+| 2.3 | Create `WordGeneratorTool` for both question types | High | ✅ |
+| 2.4 | Create `ValidationTool` with confidence scoring | Medium | ✅ |
+| 2.5 | Create `BatchProcessingTool` | Medium | ✅ |
+| 2.6 | Write unit tests for all tools | High | ✅ |
 
 ### Deliverables Created
 ```
@@ -98,12 +98,12 @@ src/tools/
 └── batch_processor.py    # Directory processing
 
 tests/
-├── test_tools.py         # Tool unit tests
+├── test_tools.py         # Tool unit tests (46 tests, all passing)
 ```
 
-### Tool Specifications
+### Tool Specifications (Implemented)
 
-#### 2.1 ImageAnalysisTool
+#### 2.1 ImageAnalysisTool (`analyze_image`)
 - **Input:** Image path, question type (auto/multiple_choice/true_false)
 - **Output:** List of extracted questions
 - **Features:**
@@ -147,28 +147,67 @@ tests/
 
 ---
 
-## Phase 3: Agent Orchestration
+## Phase 3: Agent Orchestration ✅
 
 | Task | Description | Priority | Status |
 |------|-------------|----------|--------|
-| 3.1 | Create agent prompt templates in `src/agent/prompts.py` | High |  |
-| 3.2 | Implement agent configuration in `src/agent/agent.py` | High |  |
-| 3.3 | Add conversation memory in `src/agent/memory.py` | Medium | |
-| 3.4 | Integrate all tools with AgentExecutor | High |  |
-| 3.5 | Test workflow patterns (single, batch, interactive) | High |  |
+| 3.1 | Create agent prompt templates in `src/agent/prompts.py` | High | ✅ |
+| 3.2 | Implement agent configuration in `src/agent/agent.py` | High | ✅ |
+| 3.3 | Add conversation memory in `src/agent/agent.py` | Medium | ✅ |
+| 3.4 | Integrate all tools with create_agent | High | ✅ |
+| 3.5 | Test workflow patterns (single, batch, interactive) | High | ✅ |
 
 ### Implementation Notes
-- Agent uses **Doubao** as both the agent model (`doubao-seed-1-6-251015`) and vision model (`doubao-seed-1-6-251015`)
+- Agent uses **LangChain v1's `create_agent`** with LangGraph under the hood
+- Short-term memory implemented via **`InMemorySaver`** checkpointer
+- Conversation history persisted via `thread_id` configuration
 - Environment variables: `DOUBAO_API_KEY`, `AGENT_MODEL`, `DOUBAO_MODEL`
-- 36 agent tests added to `tests/test_agent.py`
+- System prompts available in Chinese (default) and English
+
+### Architecture
+```
+LangChain create_agent (high-level API)
+         ↓
+    LangGraph Runtime
+         ↓
+  InMemorySaver (checkpointer)
+         ↓
+  Thread-scoped short-term memory
+```
 
 ### Deliverables Created
 ```
 src/agent/
 ├── __init__.py    # Public API exports
-├── agent.py       # QuestionExtractionAgent, ReAct loop, tool integration
+├── agent.py       # QuestionExtractionAgent with InMemorySaver for short-term memory
 ├── prompts.py     # System prompts (Chinese/English), templates
 ```
+
+### Key Classes and Functions
+
+#### QuestionExtractionAgent
+The main agent class with conversation memory support:
+
+```python
+from src.agent import QuestionExtractionAgent
+
+# Create agent
+agent = QuestionExtractionAgent()
+
+# Multi-turn conversation (memory preserved)
+response1 = agent.chat("提取 test.jpg 中的选择题")
+response2 = agent.chat("验证这些题目")  # Remembers context
+response3 = agent.chat("保存为Word")     # Uses previous results
+
+# Start new conversation (clear memory)
+agent.new_conversation()
+```
+
+#### Short-Term Memory Implementation
+- Uses LangGraph's `InMemorySaver` as checkpointer
+- Memory is thread-scoped via `thread_id`
+- Each conversation thread maintains its own history
+- Memory persists during the session, cleared on restart
 
 ### Workflow Patterns Implemented
 
@@ -221,15 +260,45 @@ Tool: JSONGeneratorTool
 
 ---
 
-## Phase 4: CLI & User Interface
+## Phase 4: CLI & User Interface ✅
 
 | Task | Description | Priority | Status |
 |------|-------------|----------|--------|
-| 4.1 | Implement `extract` command fully | High | ⬜ |
-| 4.2 | Implement `batch` command fully | High | ⬜ |
-| 4.3 | Implement `interactive` chat mode | High | ⬜ |
-| 4.4 | Add progress indicators with `rich` | Medium | ⬜ |
-| 4.5 | Add colorized output and error handling | Medium | ⬜ |
+| 4.1 | Implement `extract` command fully | High | ✅ |
+| 4.2 | Implement `batch` command fully | High | ✅ |
+| 4.3 | Implement `interactive` chat mode | High | ✅ |
+| 4.4 | Add progress indicators with `rich` | Medium | ✅ |
+| 4.5 | Add colorized output and error handling | Medium | ✅ |
+| 4.6 | Add memory display and tool call visualization | High | ✅ |
+
+### CLI Features Implemented
+
+#### Interactive Mode Features
+- **Conversation Memory Display**: `/memory` command shows full conversation history
+- **Tool Call Visualization**: Real-time display of tool calls with arguments
+- **Tool Result Display**: Shows tool execution results with success/failure status
+- **Streaming Support**: Agent responses streamed in real-time
+- **Session Management**: `/clear` to start new conversation, `/exit` to quit
+
+#### Display Helpers
+- `display_memory()` - Shows conversation history in a formatted table
+- `display_tool_call()` - Displays tool being called with its arguments
+- `display_tool_result()` - Shows tool execution results
+- `display_agent_response()` - Renders final agent response with Markdown
+- `display_config()` - Shows current configuration settings
+- `display_tools_list()` - Lists all available agent tools
+
+#### Interactive Commands
+| Command | Description |
+|---------|-------------|
+| `/help` | Show help message |
+| `/memory` | Display conversation memory |
+| `/clear` | Start a new conversation |
+| `/config` | Show current configuration |
+| `/tools` | List available tools |
+| `/verbose` | Toggle verbose mode |
+| `/debug` | Toggle debug mode |
+| `/exit` | Exit interactive mode |
 
 ### CLI Commands
 
@@ -237,14 +306,49 @@ Tool: JSONGeneratorTool
 # Extract from single image
 question-agent extract image.jpg -t multiple_choice -j output.json -w output.docx
 
+# Extract with verbose output (shows tool calls)
+question-agent extract image.jpg -v
+
 # Batch process directory
 question-agent batch ./images/ -t auto -j all_questions.json --recursive
 
-# Interactive mode
+# Interactive mode (default: Chinese, streaming, verbose)
 question-agent interactive
+
+# Interactive mode with English and no streaming
+question-agent interactive --language en --no-stream
+
+# Interactive mode with quiet output (no tool details)
+question-agent interactive --quiet
 
 # Show configuration
 question-agent config
+
+# List available tools
+question-agent tools
+```
+
+### Architecture
+```
+CLI (src/cli.py)
+├── Display Helpers
+│   ├── display_welcome()      # Welcome message
+│   ├── display_memory()       # Memory/history view
+│   ├── display_tool_call()    # Tool invocation display
+│   ├── display_tool_result()  # Tool result display
+│   ├── display_agent_response() # Final response
+│   └── display_config()       # Configuration view
+│
+├── Chat Handlers
+│   ├── stream_chat()          # Streaming mode
+│   └── invoke_chat()          # Non-streaming mode
+│
+└── Commands
+    ├── extract               # Single/multiple image processing
+    ├── batch                 # Directory batch processing
+    ├── interactive           # Chat mode
+    ├── config                # Show configuration
+    └── tools                 # List tools
 ```
 
 ---
@@ -308,13 +412,15 @@ Week 6: Phase 6 - Documentation
 ### Production Dependencies
 ```toml
 dependencies = [
-    "langchain>=0.3.0",
-    "langchain-openai>=0.2.0",
-    "langgraph>=0.2.0",
+    "langchain>=1.1.0",
+    "langchain-openai>=1.1.0",
+    "langgraph>=0.4.0",
+    "langgraph-checkpoint>=2.0.0",
     "openai>=1.0.0",
     "python-docx>=1.2.0",
     "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
     "click>=8.1.0",
     "rich>=13.0.0",
 ]
