@@ -10,8 +10,10 @@ import os
 from pathlib import Path
 from typing import Literal
 
+from langchain.agents import create_agent
+from langchain.agents.structured_output import ProviderStrategy
 from langchain.tools import tool
-from openai import OpenAI
+from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from ..models.config import get_settings
@@ -145,22 +147,24 @@ def build_image_content(image_paths: list[str]) -> list[dict]:
     return content
 
 
-def extract_multiple_choice(client: OpenAI, model: str, image_paths: list[str]) -> list[dict]:
-    """Extract multiple choice questions from images."""
+def extract_multiple_choice(llm: ChatOpenAI, image_paths: list[str]) -> list[dict]:
+    """Extract multiple choice questions from images using LangChain agent."""
     content = [{"type": "text", "text": "请识别以下图片中的所有选择题。"}]
     content.extend(build_image_content(image_paths))
     
-    response = client.beta.chat.completions.parse(
-        model=model,
-        messages=[
-            {"role": "system", "content": MULTIPLE_CHOICE_PROMPT},
-            {"role": "user", "content": content}
-        ],
-        temperature=0.1,
-        response_format=MultipleChoiceResponse,
+    # Create agent with ProviderStrategy for native structured output
+    agent = create_agent(
+        model=llm,
+        system_prompt=MULTIPLE_CHOICE_PROMPT,
+        tools=[],
+        response_format=ProviderStrategy(MultipleChoiceResponse),
     )
     
-    result = response.choices[0].message.parsed
+    response = agent.invoke({
+        "messages": [{"role": "user", "content": content}]
+    })
+    
+    result = response["structured_response"]
     
     return [
         {
@@ -176,42 +180,46 @@ def extract_multiple_choice(client: OpenAI, model: str, image_paths: list[str]) 
     ]
 
 
-def extract_true_false(client: OpenAI, model: str, image_paths: list[str]) -> list[dict]:
-    """Extract true/false questions from images."""
+def extract_true_false(llm: ChatOpenAI, image_paths: list[str]) -> list[dict]:
+    """Extract true/false questions from images using LangChain agent."""
     content = [{"type": "text", "text": "请识别以下图片中的所有判断题。"}]
     content.extend(build_image_content(image_paths))
     
-    response = client.beta.chat.completions.parse(
-        model=model,
-        messages=[
-            {"role": "system", "content": TRUE_FALSE_PROMPT},
-            {"role": "user", "content": content}
-        ],
-        temperature=0.1,
-        response_format=TrueFalseResponse,
+    # Create agent with ProviderStrategy for native structured output
+    agent = create_agent(
+        model=llm,
+        system_prompt=TRUE_FALSE_PROMPT,
+        tools=[],
+        response_format=ProviderStrategy(TrueFalseResponse),
     )
     
-    result = response.choices[0].message.parsed
+    response = agent.invoke({
+        "messages": [{"role": "user", "content": content}]
+    })
+    
+    result = response["structured_response"]
     
     return [{"title": q.title} for q in result.questions]
 
 
-def extract_mixed(client: OpenAI, model: str, image_paths: list[str]) -> dict:
-    """Extract both multiple choice and true/false questions from images."""
+def extract_mixed(llm: ChatOpenAI, image_paths: list[str]) -> dict:
+    """Extract both multiple choice and true/false questions from images using LangChain agent."""
     content = [{"type": "text", "text": "请识别以下图片中的所有题目，包括选择题和判断题。"}]
     content.extend(build_image_content(image_paths))
     
-    response = client.beta.chat.completions.parse(
-        model=model,
-        messages=[
-            {"role": "system", "content": MIXED_PROMPT},
-            {"role": "user", "content": content}
-        ],
-        temperature=0.1,
-        response_format=MixedResponse,
+    # Create agent with ProviderStrategy for native structured output
+    agent = create_agent(
+        model=llm,
+        system_prompt=MIXED_PROMPT,
+        tools=[],
+        response_format=ProviderStrategy(MixedResponse),
     )
     
-    result = response.choices[0].message.parsed
+    response = agent.invoke({
+        "messages": [{"role": "user", "content": content}]
+    })
+    
+    result = response["structured_response"]
     
     multiple_choice = [
         {
@@ -283,23 +291,26 @@ def analyze_image(
         # Get settings
         settings = get_settings()
         
-        # Create OpenAI client
-        client = OpenAI(
+        # Create LangChain ChatOpenAI client with custom base URL
+        llm = ChatOpenAI(
             api_key=settings.doubao_api_key,
             base_url=settings.doubao_base_url,
+            model=settings.doubao_model,
+            temperature=0.1,
+            max_tokens=settings.doubao_max_tokens,
         )
         
         # Extract questions based on type
         if question_type == "multiple_choice":
-            questions = extract_multiple_choice(client, settings.doubao_model, valid_paths)
+            questions = extract_multiple_choice(llm, valid_paths)
             total_count = len(questions)
             result_data = questions
         elif question_type == "true_false":
-            questions = extract_true_false(client, settings.doubao_model, valid_paths)
+            questions = extract_true_false(llm, valid_paths)
             total_count = len(questions)
             result_data = questions
         else:  # mixed
-            result = extract_mixed(client, settings.doubao_model, valid_paths)
+            result = extract_mixed(llm, valid_paths)
             mc_count = len(result["multiple_choice"])
             tf_count = len(result["true_false"])
             total_count = mc_count + tf_count

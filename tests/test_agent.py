@@ -272,7 +272,8 @@ class TestChatMethod:
         agent = QuestionExtractionAgent()
         response = agent.chat("Test")
         
-        assert response == "Extracted response"
+        assert response.message == "Extracted response"
+        assert response.success == True
     
     @patch("src.agent.agent.ChatOpenAI")
     @patch("src.agent.agent.create_agent")
@@ -285,7 +286,8 @@ class TestChatMethod:
         agent = QuestionExtractionAgent()
         response = agent.chat("Test")
         
-        assert response == "No response generated."
+        assert response.message == "No response generated."
+        assert response.success == False
     
     @patch("src.agent.agent.ChatOpenAI")
     @patch("src.agent.agent.create_agent")
@@ -384,7 +386,8 @@ class TestFactoryFunctions:
         
         result = extract_questions("Extract from test.jpg")
         
-        assert result == "Extracted 5 questions"
+        assert result.message == "Extracted 5 questions"
+        assert result.success == True
 
 
 # =============================================================================

@@ -2,7 +2,7 @@
 Unit tests for LangChain tools.
 
 Tests cover the JSON generator, Word generator, validation, and batch processing tools.
-Image analysis tests require mocking the OpenAI client.
+Image analysis tests require mocking the LangChain ChatOpenAI client.
 """
 
 import json
@@ -1011,29 +1011,32 @@ class TestAnalyzeImageTool:
 
 
 class TestExtractFunctions:
-    """Tests for extract functions with mocked OpenAI client."""
+    """Tests for extract functions with mocked LangChain create_agent."""
     
     def test_extract_multiple_choice(self):
-        """Test extract_multiple_choice with mocked client."""
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.parsed = MultipleChoiceResponse(
-            questions=[
-                MultipleChoiceItem(
-                    title="What is 2+2?",
-                    options=Options(a="3", b="4", c="5", d="6")
-                ),
-                MultipleChoiceItem(
-                    title="Capital of France?",
-                    options=Options(a="London", b="Paris", c="Berlin", d="Madrid")
-                ),
-            ]
-        )
-        mock_client.beta.chat.completions.parse.return_value = mock_response
+        """Test extract_multiple_choice with mocked create_agent."""
+        mock_llm = MagicMock()
+        mock_agent = MagicMock()
+        
+        # Mock the agent invoke response
+        mock_agent.invoke.return_value = {
+            "structured_response": MultipleChoiceResponse(
+                questions=[
+                    MultipleChoiceItem(
+                        title="What is 2+2?",
+                        options=Options(a="3", b="4", c="5", d="6")
+                    ),
+                    MultipleChoiceItem(
+                        title="Capital of France?",
+                        options=Options(a="London", b="Paris", c="Berlin", d="Madrid")
+                    ),
+                ]
+            )
+        }
         
         with patch("src.tools.image_analysis.build_image_content", return_value=[]):
-            result = extract_multiple_choice(mock_client, "test-model", ["fake_path.png"])
+            with patch("src.tools.image_analysis.create_agent", return_value=mock_agent):
+                result = extract_multiple_choice(mock_llm, ["fake_path.png"])
         
         assert len(result) == 2
         assert result[0]["title"] == "What is 2+2?"
@@ -1042,46 +1045,52 @@ class TestExtractFunctions:
         assert result[1]["title"] == "Capital of France?"
     
     def test_extract_true_false(self):
-        """Test extract_true_false with mocked client."""
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.parsed = TrueFalseResponse(
-            questions=[
-                TrueFalseItem(title="The sky is blue."),
-                TrueFalseItem(title="Water boils at 50°C."),
-            ]
-        )
-        mock_client.beta.chat.completions.parse.return_value = mock_response
+        """Test extract_true_false with mocked create_agent."""
+        mock_llm = MagicMock()
+        mock_agent = MagicMock()
+        
+        # Mock the agent invoke response
+        mock_agent.invoke.return_value = {
+            "structured_response": TrueFalseResponse(
+                questions=[
+                    TrueFalseItem(title="The sky is blue."),
+                    TrueFalseItem(title="Water boils at 50°C."),
+                ]
+            )
+        }
         
         with patch("src.tools.image_analysis.build_image_content", return_value=[]):
-            result = extract_true_false(mock_client, "test-model", ["fake_path.png"])
+            with patch("src.tools.image_analysis.create_agent", return_value=mock_agent):
+                result = extract_true_false(mock_llm, ["fake_path.png"])
         
         assert len(result) == 2
         assert result[0]["title"] == "The sky is blue."
         assert result[1]["title"] == "Water boils at 50°C."
     
     def test_extract_mixed(self):
-        """Test extract_mixed with mocked client."""
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.parsed = MixedResponse(
-            multiple_choice_questions=[
-                MultipleChoiceItem(
-                    title="What is 2+2?",
-                    options=Options(a="3", b="4", c="5", d="6")
-                ),
-            ],
-            true_false_questions=[
-                TrueFalseItem(title="The sky is blue."),
-                TrueFalseItem(title="Fire is cold."),
-            ]
-        )
-        mock_client.beta.chat.completions.parse.return_value = mock_response
+        """Test extract_mixed with mocked create_agent."""
+        mock_llm = MagicMock()
+        mock_agent = MagicMock()
+        
+        # Mock the agent invoke response
+        mock_agent.invoke.return_value = {
+            "structured_response": MixedResponse(
+                multiple_choice_questions=[
+                    MultipleChoiceItem(
+                        title="What is 2+2?",
+                        options=Options(a="3", b="4", c="5", d="6")
+                    ),
+                ],
+                true_false_questions=[
+                    TrueFalseItem(title="The sky is blue."),
+                    TrueFalseItem(title="Fire is cold."),
+                ]
+            )
+        }
         
         with patch("src.tools.image_analysis.build_image_content", return_value=[]):
-            result = extract_mixed(mock_client, "test-model", ["fake_path.png"])
+            with patch("src.tools.image_analysis.create_agent", return_value=mock_agent):
+                result = extract_mixed(mock_llm, ["fake_path.png"])
         
         assert "multiple_choice" in result
         assert "true_false" in result
@@ -1094,19 +1103,22 @@ class TestExtractFunctions:
     
     def test_extract_mixed_empty_one_type(self):
         """Test extract_mixed when one type has no questions."""
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.parsed = MixedResponse(
-            multiple_choice_questions=[],
-            true_false_questions=[
-                TrueFalseItem(title="Statement 1"),
-            ]
-        )
-        mock_client.beta.chat.completions.parse.return_value = mock_response
+        mock_llm = MagicMock()
+        mock_agent = MagicMock()
+        
+        # Mock the agent invoke response
+        mock_agent.invoke.return_value = {
+            "structured_response": MixedResponse(
+                multiple_choice_questions=[],
+                true_false_questions=[
+                    TrueFalseItem(title="Statement 1"),
+                ]
+            )
+        }
         
         with patch("src.tools.image_analysis.build_image_content", return_value=[]):
-            result = extract_mixed(mock_client, "test-model", ["fake_path.png"])
+            with patch("src.tools.image_analysis.create_agent", return_value=mock_agent):
+                result = extract_mixed(mock_llm, ["fake_path.png"])
         
         assert len(result["multiple_choice"]) == 0
         assert len(result["true_false"]) == 1
@@ -1115,29 +1127,33 @@ class TestExtractFunctions:
 class TestAnalyzeImageToolWithMocking:
     """Integration tests for analyze_image tool with mocked dependencies."""
     
-    @patch("src.tools.image_analysis.OpenAI")
+    @patch("src.tools.image_analysis.create_agent")
+    @patch("src.tools.image_analysis.ChatOpenAI")
     @patch("src.tools.image_analysis.get_settings")
-    def test_analyze_multiple_choice_success(self, mock_get_settings, mock_openai_class, tmp_path):
+    def test_analyze_multiple_choice_success(self, mock_get_settings, mock_chat_openai_class, mock_create_agent, tmp_path):
         """Test successful multiple choice extraction."""
         # Setup mock settings
         mock_settings = MagicMock()
         mock_settings.doubao_api_key = "test-key"
         mock_settings.doubao_base_url = "https://test.api"
         mock_settings.doubao_model = "test-model"
+        mock_settings.doubao_max_tokens = 4096
         mock_get_settings.return_value = mock_settings
         
-        # Setup mock client
-        mock_client = MagicMock()
-        mock_openai_class.return_value = mock_client
+        # Setup mock LangChain ChatOpenAI client
+        mock_llm = MagicMock()
+        mock_chat_openai_class.return_value = mock_llm
         
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.parsed = MultipleChoiceResponse(
-            questions=[
-                MultipleChoiceItem(title="Q1", options=Options(a="A", b="B", c="C", d="D")),
-            ]
-        )
-        mock_client.beta.chat.completions.parse.return_value = mock_response
+        # Setup mock agent
+        mock_agent = MagicMock()
+        mock_create_agent.return_value = mock_agent
+        mock_agent.invoke.return_value = {
+            "structured_response": MultipleChoiceResponse(
+                questions=[
+                    MultipleChoiceItem(title="Q1", options=Options(a="A", b="B", c="C", d="D")),
+                ]
+            )
+        }
         
         # Create test image
         image_path = tmp_path / "test.png"
@@ -1151,28 +1167,31 @@ class TestAnalyzeImageToolWithMocking:
         assert "Successfully extracted 1 multiple choice question" in result
         assert "Q1" in result
     
-    @patch("src.tools.image_analysis.OpenAI")
+    @patch("src.tools.image_analysis.create_agent")
+    @patch("src.tools.image_analysis.ChatOpenAI")
     @patch("src.tools.image_analysis.get_settings")
-    def test_analyze_true_false_success(self, mock_get_settings, mock_openai_class, tmp_path):
+    def test_analyze_true_false_success(self, mock_get_settings, mock_chat_openai_class, mock_create_agent, tmp_path):
         """Test successful true/false extraction."""
         mock_settings = MagicMock()
         mock_settings.doubao_api_key = "test-key"
         mock_settings.doubao_base_url = "https://test.api"
         mock_settings.doubao_model = "test-model"
+        mock_settings.doubao_max_tokens = 4096
         mock_get_settings.return_value = mock_settings
         
-        mock_client = MagicMock()
-        mock_openai_class.return_value = mock_client
+        mock_llm = MagicMock()
+        mock_chat_openai_class.return_value = mock_llm
         
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.parsed = TrueFalseResponse(
-            questions=[
-                TrueFalseItem(title="Statement 1"),
-                TrueFalseItem(title="Statement 2"),
-            ]
-        )
-        mock_client.beta.chat.completions.parse.return_value = mock_response
+        mock_agent = MagicMock()
+        mock_create_agent.return_value = mock_agent
+        mock_agent.invoke.return_value = {
+            "structured_response": TrueFalseResponse(
+                questions=[
+                    TrueFalseItem(title="Statement 1"),
+                    TrueFalseItem(title="Statement 2"),
+                ]
+            )
+        }
         
         image_path = tmp_path / "test.png"
         image_path.write_bytes(b"fake image data")
@@ -1186,31 +1205,34 @@ class TestAnalyzeImageToolWithMocking:
         assert "Statement 1" in result
         assert "Statement 2" in result
     
-    @patch("src.tools.image_analysis.OpenAI")
+    @patch("src.tools.image_analysis.create_agent")
+    @patch("src.tools.image_analysis.ChatOpenAI")
     @patch("src.tools.image_analysis.get_settings")
-    def test_analyze_mixed_success(self, mock_get_settings, mock_openai_class, tmp_path):
+    def test_analyze_mixed_success(self, mock_get_settings, mock_chat_openai_class, mock_create_agent, tmp_path):
         """Test successful mixed extraction."""
         mock_settings = MagicMock()
         mock_settings.doubao_api_key = "test-key"
         mock_settings.doubao_base_url = "https://test.api"
         mock_settings.doubao_model = "test-model"
+        mock_settings.doubao_max_tokens = 4096
         mock_get_settings.return_value = mock_settings
         
-        mock_client = MagicMock()
-        mock_openai_class.return_value = mock_client
+        mock_llm = MagicMock()
+        mock_chat_openai_class.return_value = mock_llm
         
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.parsed = MixedResponse(
-            multiple_choice_questions=[
-                MultipleChoiceItem(title="MC Question", options=Options(a="A", b="B", c="C", d="D")),
-            ],
-            true_false_questions=[
-                TrueFalseItem(title="TF Statement 1"),
-                TrueFalseItem(title="TF Statement 2"),
-            ]
-        )
-        mock_client.beta.chat.completions.parse.return_value = mock_response
+        mock_agent = MagicMock()
+        mock_create_agent.return_value = mock_agent
+        mock_agent.invoke.return_value = {
+            "structured_response": MixedResponse(
+                multiple_choice_questions=[
+                    MultipleChoiceItem(title="MC Question", options=Options(a="A", b="B", c="C", d="D")),
+                ],
+                true_false_questions=[
+                    TrueFalseItem(title="TF Statement 1"),
+                    TrueFalseItem(title="TF Statement 2"),
+                ]
+            )
+        }
         
         image_path = tmp_path / "test.png"
         image_path.write_bytes(b"fake image data")
@@ -1227,28 +1249,31 @@ class TestAnalyzeImageToolWithMocking:
         assert "multiple_choice" in result
         assert "true_false" in result
     
-    @patch("src.tools.image_analysis.OpenAI")
+    @patch("src.tools.image_analysis.create_agent")
+    @patch("src.tools.image_analysis.ChatOpenAI")
     @patch("src.tools.image_analysis.get_settings")
-    def test_analyze_mixed_only_multiple_choice(self, mock_get_settings, mock_openai_class, tmp_path):
+    def test_analyze_mixed_only_multiple_choice(self, mock_get_settings, mock_chat_openai_class, mock_create_agent, tmp_path):
         """Test mixed extraction when only multiple choice found."""
         mock_settings = MagicMock()
         mock_settings.doubao_api_key = "test-key"
         mock_settings.doubao_base_url = "https://test.api"
         mock_settings.doubao_model = "test-model"
+        mock_settings.doubao_max_tokens = 4096
         mock_get_settings.return_value = mock_settings
         
-        mock_client = MagicMock()
-        mock_openai_class.return_value = mock_client
+        mock_llm = MagicMock()
+        mock_chat_openai_class.return_value = mock_llm
         
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.parsed = MixedResponse(
-            multiple_choice_questions=[
-                MultipleChoiceItem(title="Only MC", options=Options(a="A", b="B", c="C", d="D")),
-            ],
-            true_false_questions=[]
-        )
-        mock_client.beta.chat.completions.parse.return_value = mock_response
+        mock_agent = MagicMock()
+        mock_create_agent.return_value = mock_agent
+        mock_agent.invoke.return_value = {
+            "structured_response": MixedResponse(
+                multiple_choice_questions=[
+                    MultipleChoiceItem(title="Only MC", options=Options(a="A", b="B", c="C", d="D")),
+                ],
+                true_false_questions=[]
+            )
+        }
         
         image_path = tmp_path / "test.png"
         image_path.write_bytes(b"fake image data")
@@ -1260,28 +1285,31 @@ class TestAnalyzeImageToolWithMocking:
         
         assert "1 multiple choice, 0 true/false" in result
     
-    @patch("src.tools.image_analysis.OpenAI")
+    @patch("src.tools.image_analysis.create_agent")
+    @patch("src.tools.image_analysis.ChatOpenAI")
     @patch("src.tools.image_analysis.get_settings")
-    def test_analyze_with_multiple_images(self, mock_get_settings, mock_openai_class, tmp_path):
+    def test_analyze_with_multiple_images(self, mock_get_settings, mock_chat_openai_class, mock_create_agent, tmp_path):
         """Test analysis with multiple images."""
         mock_settings = MagicMock()
         mock_settings.doubao_api_key = "test-key"
         mock_settings.doubao_base_url = "https://test.api"
         mock_settings.doubao_model = "test-model"
+        mock_settings.doubao_max_tokens = 4096
         mock_get_settings.return_value = mock_settings
         
-        mock_client = MagicMock()
-        mock_openai_class.return_value = mock_client
+        mock_llm = MagicMock()
+        mock_chat_openai_class.return_value = mock_llm
         
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.parsed = MultipleChoiceResponse(
-            questions=[
-                MultipleChoiceItem(title="Q1", options=Options(a="A", b="B", c="C", d="D")),
-                MultipleChoiceItem(title="Q2", options=Options(a="1", b="2", c="3", d="4")),
-            ]
-        )
-        mock_client.beta.chat.completions.parse.return_value = mock_response
+        mock_agent = MagicMock()
+        mock_create_agent.return_value = mock_agent
+        mock_agent.invoke.return_value = {
+            "structured_response": MultipleChoiceResponse(
+                questions=[
+                    MultipleChoiceItem(title="Q1", options=Options(a="A", b="B", c="C", d="D")),
+                    MultipleChoiceItem(title="Q2", options=Options(a="1", b="2", c="3", d="4")),
+                ]
+            )
+        }
         
         # Create multiple test images
         image1 = tmp_path / "test1.png"
@@ -1297,19 +1325,24 @@ class TestAnalyzeImageToolWithMocking:
         assert "Successfully extracted 2 multiple choice question" in result
         assert "Source images: 2" in result
     
-    @patch("src.tools.image_analysis.OpenAI")
+    @patch("src.tools.image_analysis.create_agent")
+    @patch("src.tools.image_analysis.ChatOpenAI")
     @patch("src.tools.image_analysis.get_settings")
-    def test_analyze_api_error(self, mock_get_settings, mock_openai_class, tmp_path):
+    def test_analyze_api_error(self, mock_get_settings, mock_chat_openai_class, mock_create_agent, tmp_path):
         """Test handling of API errors."""
         mock_settings = MagicMock()
         mock_settings.doubao_api_key = "test-key"
         mock_settings.doubao_base_url = "https://test.api"
         mock_settings.doubao_model = "test-model"
+        mock_settings.doubao_max_tokens = 4096
         mock_get_settings.return_value = mock_settings
         
-        mock_client = MagicMock()
-        mock_openai_class.return_value = mock_client
-        mock_client.beta.chat.completions.parse.side_effect = Exception("API Error")
+        mock_llm = MagicMock()
+        mock_chat_openai_class.return_value = mock_llm
+        
+        mock_agent = MagicMock()
+        mock_create_agent.return_value = mock_agent
+        mock_agent.invoke.side_effect = Exception("API Error")
         
         image_path = tmp_path / "test.png"
         image_path.write_bytes(b"fake image data")
