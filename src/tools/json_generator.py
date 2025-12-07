@@ -13,12 +13,15 @@ from typing import Any
 from langchain.tools import tool
 
 
-def parse_questions_input(questions_json: str) -> tuple[list[dict] | dict, str | None]:
+def parse_questions_input(questions_json: str) -> tuple[dict, str | None]:
     """Parse questions from JSON string input.
     
-    Supports two formats:
-    1. Array format: [{"title": "...", ...}, ...]
-    2. Mixed format: {"multiple_choice": [...], "true_false": [...]}
+    Only supports the unified dictionary format:
+    {
+        "type": "...",
+        "multiple_choice": [...],
+        "true_false": [...]
+    }
     
     Args:
         questions_json: JSON string containing questions
@@ -28,20 +31,17 @@ def parse_questions_input(questions_json: str) -> tuple[list[dict] | dict, str |
     """
     try:
         data = json.loads(questions_json)
-        # Support both array format and mixed format from image analysis
-        if isinstance(data, list):
-            return data, None
-        elif isinstance(data, dict):
-            # Check for mixed format
+        if isinstance(data, dict):
+            # Check for valid keys
             if "multiple_choice" in data or "true_false" in data:
                 return data, None
-            return [], "Invalid format: dictionary must contain 'multiple_choice' or 'true_false' keys"
-        return [], "Questions must be a JSON array or mixed format object"
+            return {}, "Invalid format: dictionary must contain 'multiple_choice' or 'true_false' keys"
+        return {}, "Questions must be a JSON object (dictionary)"
     except json.JSONDecodeError as e:
-        return [], f"Invalid JSON: {str(e)}"
+        return {}, f"Invalid JSON: {str(e)}"
 
 
-def load_existing_questions(file_path: Path) -> tuple[list[dict] | dict, str | None]:
+def load_existing_questions(file_path: Path) -> tuple[dict, str | None]:
     """Load existing questions from a JSON file.
     
     Args:
@@ -51,34 +51,31 @@ def load_existing_questions(file_path: Path) -> tuple[list[dict] | dict, str | N
         Tuple of (questions data, error message or None)
     """
     if not file_path.exists():
-        return [], None
+        return {}, None
     
     try:
         content = file_path.read_text(encoding="utf-8")
         data = json.loads(content)
-        if isinstance(data, list):
-            return data, None
-        elif isinstance(data, dict):
-            # Support mixed format
+        if isinstance(data, dict):
             if "multiple_choice" in data or "true_false" in data:
                 return data, None
-            return [], "Existing file has invalid format"
-        return [], "Existing file does not contain a JSON array or valid mixed format"
+            return {}, "Existing file has invalid format"
+        return {}, "Existing file does not contain a valid JSON object"
     except json.JSONDecodeError as e:
-        return [], f"Existing file has invalid JSON: {str(e)}"
+        return {}, f"Existing file has invalid JSON: {str(e)}"
     except Exception as e:
-        return [], f"Error reading file: {str(e)}"
+        return {}, f"Error reading file: {str(e)}"
 
 
 def save_questions_to_json(
-    questions: list[dict] | dict,
+    questions: dict,
     output_path: Path,
     pretty: bool = True
 ) -> tuple[bool, str]:
     """Save questions to a JSON file.
     
     Args:
-        questions: List of question dictionaries or mixed format dict
+        questions: Question dictionary
         output_path: Path to save the JSON file
         pretty: Whether to format with indentation
         
@@ -99,10 +96,7 @@ def save_questions_to_json(
         output_path.write_text(content, encoding="utf-8")
         
         # Count questions for message
-        if isinstance(questions, dict):
-            count = len(questions.get("multiple_choice", [])) + len(questions.get("true_false", []))
-        else:
-            count = len(questions)
+        count = len(questions.get("multiple_choice", [])) + len(questions.get("true_false", []))
         
         return True, f"Saved {count} questions to {output_path}"
         
@@ -124,9 +118,8 @@ def save_questions_json(
     overwrite and append modes for building up question banks.
     
     Args:
-        questions_json: JSON string containing questions. Supports two formats:
-                       1. Array format: [{"title": "...", "options": {...}}] or [{"title": "..."}]
-                       2. Mixed format from image analysis: {"multiple_choice": [...], "true_false": [...]}
+        questions_json: JSON string containing questions in the unified dictionary format:
+                       {"multiple_choice": [...], "true_false": [...]}
         output_path: File path where the JSON will be saved.
                     Will create parent directories if needed.
         append: If True, append questions to existing file.
@@ -141,31 +134,21 @@ def save_questions_json(
         A string describing the result of the operation.
     """
     # Parse input questions
-    data, error = parse_questions_input(questions_json)
+    questions, error = parse_questions_input(questions_json)
     if error:
         return f"Error: {error}"
     
-    # Handle mixed format
-    if isinstance(data, dict):
-        mc_questions = data.get("multiple_choice", [])
-        tf_questions = data.get("true_false", [])
-        
-        if question_type == "multiple_choice":
-            questions = mc_questions
-        elif question_type == "true_false":
-            questions = tf_questions
-        else:  # auto - save as mixed format or flatten
-            # Save in mixed format to preserve structure
-            if not mc_questions and not tf_questions:
-                return "Error: No questions provided. Both multiple_choice and true_false arrays are empty."
-            questions = data  # Keep the mixed format
-    else:
-        questions = data
+    # Handle filtering by type
+    mc_questions = questions.get("multiple_choice", [])
+    tf_questions = questions.get("true_false", [])
+    
+    if question_type == "multiple_choice":
+        questions = {"multiple_choice": mc_questions, "true_false": []}
+    elif question_type == "true_false":
+        questions = {"multiple_choice": [], "true_false": tf_questions}
     
     # Check if questions is empty
-    if isinstance(questions, list) and not questions:
-        return "Error: No questions provided. The questions array is empty."
-    if isinstance(questions, dict) and not questions.get("multiple_choice") and not questions.get("true_false"):
+    if not questions.get("multiple_choice") and not questions.get("true_false"):
         return "Error: No questions provided. Both arrays are empty."
     
     # Convert to Path object
@@ -176,10 +159,7 @@ def save_questions_json(
         file_path = file_path.with_suffix(".json")
     
     # Count questions for reporting
-    if isinstance(questions, dict):
-        q_count = len(questions.get("multiple_choice", [])) + len(questions.get("true_false", []))
-    else:
-        q_count = len(questions)
+    q_count = len(questions.get("multiple_choice", [])) + len(questions.get("true_false", []))
     
     # Handle append mode
     if append and file_path.exists():
@@ -187,20 +167,23 @@ def save_questions_json(
         if error:
             return f"Error loading existing file: {error}"
         
-        # For mixed format appending to list, flatten to list
-        if isinstance(questions, dict) and isinstance(existing, list):
-            # Flatten mixed to list
-            flat_questions = questions.get("multiple_choice", []) + questions.get("true_false", [])
-            combined = existing + flat_questions
-        elif isinstance(questions, list) and isinstance(existing, list):
-            combined = existing + questions
-        else:
-            return "Error: Cannot append mixed format to non-list file or vice versa"
+        # Merge existing and new questions
+        combined = {
+            "multiple_choice": existing.get("multiple_choice", []) + questions.get("multiple_choice", []),
+            "true_false": existing.get("true_false", []) + questions.get("true_false", [])
+        }
+        
+        # Preserve type if present
+        if "type" in existing:
+            combined["type"] = existing["type"]
+        elif "type" in questions:
+            combined["type"] = questions["type"]
         
         success, message = save_questions_to_json(combined, file_path, pretty)
         
         if success:
-            return f"Appended {q_count} questions to existing {len(existing)} questions.\n{message}"
+            existing_count = len(existing.get("multiple_choice", [])) + len(existing.get("true_false", []))
+            return f"Appended {q_count} questions to existing {existing_count} questions.\n{message}"
         return message
     
     # Save (overwrite or new file)

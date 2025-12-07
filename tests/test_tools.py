@@ -57,29 +57,28 @@ class TestParseQuestionsInput:
     """Tests for parse_questions_input function."""
     
     def test_valid_json_array(self):
-        """Test parsing a valid JSON array."""
+        """Test that JSON array is rejected."""
         input_json = '[{"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}}]'
         questions, error = parse_questions_input(input_json)
-        assert error is None
-        assert len(questions) == 1
-        assert questions[0]["title"] == "Q1"
+        assert questions == {}
+        assert "JSON object" in error
     
     def test_empty_array(self):
-        """Test parsing an empty array."""
+        """Test that empty array is rejected."""
         questions, error = parse_questions_input("[]")
-        assert error is None
-        assert questions == []
+        assert questions == {}
+        assert "JSON object" in error
     
     def test_invalid_json(self):
         """Test parsing invalid JSON."""
         questions, error = parse_questions_input("not json")
-        assert questions == []
+        assert questions == {}
         assert "Invalid JSON" in error
     
     def test_json_object_instead_of_array(self):
         """Test that non-mixed JSON objects are rejected."""
         questions, error = parse_questions_input('{"title": "Q1"}')
-        assert questions == []
+        assert questions == {}
         assert "must contain 'multiple_choice' or 'true_false' keys" in error
     
     def test_mixed_format(self):
@@ -113,7 +112,10 @@ class TestSaveQuestionsToJson:
     
     def test_save_questions(self, tmp_path):
         """Test saving questions to a JSON file."""
-        questions = [{"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}}]
+        questions = {
+            "multiple_choice": [{"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}}],
+            "true_false": []
+        }
         output_path = tmp_path / "output.json"
         
         success, message = save_questions_to_json(questions, output_path, pretty=True)
@@ -123,12 +125,12 @@ class TestSaveQuestionsToJson:
         
         # Verify content
         content = json.loads(output_path.read_text(encoding="utf-8"))
-        assert len(content) == 1
-        assert content[0]["title"] == "Q1"
+        assert len(content["multiple_choice"]) == 1
+        assert content["multiple_choice"][0]["title"] == "Q1"
     
     def test_save_creates_parent_directories(self, tmp_path):
         """Test that parent directories are created."""
-        questions = [{"title": "Q1"}]
+        questions = {"multiple_choice": [{"title": "Q1"}], "true_false": []}
         output_path = tmp_path / "subdir" / "nested" / "output.json"
         
         success, message = save_questions_to_json(questions, output_path)
@@ -138,7 +140,7 @@ class TestSaveQuestionsToJson:
     
     def test_save_with_chinese_characters(self, tmp_path):
         """Test saving questions with Chinese characters."""
-        questions = [{"title": "这是一道选择题"}]
+        questions = {"multiple_choice": [{"title": "这是一道选择题"}], "true_false": []}
         output_path = tmp_path / "chinese.json"
         
         success, message = save_questions_to_json(questions, output_path)
@@ -154,19 +156,19 @@ class TestLoadExistingQuestions:
     def test_load_nonexistent_file(self, tmp_path):
         """Test loading from a non-existent file."""
         questions, error = load_existing_questions(tmp_path / "nonexistent.json")
-        assert questions == []
+        assert questions == {}
         assert error is None
     
     def test_load_valid_file(self, tmp_path):
         """Test loading from a valid JSON file."""
         file_path = tmp_path / "questions.json"
-        file_path.write_text('[{"title": "Q1"}]', encoding="utf-8")
+        file_path.write_text('{"multiple_choice": [{"title": "Q1"}], "true_false": []}', encoding="utf-8")
         
         questions, error = load_existing_questions(file_path)
         
         assert error is None
-        assert len(questions) == 1
-        assert questions[0]["title"] == "Q1"
+        assert len(questions["multiple_choice"]) == 1
+        assert questions["multiple_choice"][0]["title"] == "Q1"
     
     def test_load_invalid_json(self, tmp_path):
         """Test loading from a file with invalid JSON."""
@@ -175,7 +177,7 @@ class TestLoadExistingQuestions:
         
         questions, error = load_existing_questions(file_path)
         
-        assert questions == []
+        assert questions == {}
         assert "invalid JSON" in error
 
 
@@ -184,7 +186,10 @@ class TestSaveQuestionsJsonTool:
     
     def test_save_multiple_choice(self, tmp_path):
         """Test saving multiple choice questions."""
-        questions = [{"title": "What is 2+2?", "options": {"a": "3", "b": "4", "c": "5", "d": "6"}}]
+        questions = {
+            "multiple_choice": [{"title": "What is 2+2?", "options": {"a": "3", "b": "4", "c": "5", "d": "6"}}],
+            "true_false": []
+        }
         output_path = tmp_path / "mc.json"
         
         result = save_questions_json.invoke({
@@ -197,7 +202,10 @@ class TestSaveQuestionsJsonTool:
     
     def test_save_true_false(self, tmp_path):
         """Test saving true/false questions."""
-        questions = [{"title": "The sky is blue."}]
+        questions = {
+            "multiple_choice": [],
+            "true_false": [{"title": "The sky is blue."}]
+        }
         output_path = tmp_path / "tf.json"
         
         result = save_questions_json.invoke({
@@ -212,11 +220,11 @@ class TestSaveQuestionsJsonTool:
         output_path = tmp_path / "append.json"
         
         # Save initial questions
-        initial = [{"title": "Q1"}]
+        initial = {"multiple_choice": [{"title": "Q1"}], "true_false": []}
         output_path.write_text(json.dumps(initial), encoding="utf-8")
         
         # Append more questions
-        additional = [{"title": "Q2"}]
+        additional = {"multiple_choice": [{"title": "Q2"}], "true_false": []}
         result = save_questions_json.invoke({
             "questions_json": json.dumps(additional),
             "output_path": str(output_path),
@@ -227,7 +235,7 @@ class TestSaveQuestionsJsonTool:
         
         # Verify combined content
         content = json.loads(output_path.read_text(encoding="utf-8"))
-        assert len(content) == 2
+        assert len(content["multiple_choice"]) == 2
     
     def test_error_invalid_json(self, tmp_path):
         """Test error handling for invalid JSON."""
@@ -241,7 +249,7 @@ class TestSaveQuestionsJsonTool:
     def test_error_empty_questions(self, tmp_path):
         """Test error handling for empty questions."""
         result = save_questions_json.invoke({
-            "questions_json": "[]",
+            "questions_json": json.dumps({"multiple_choice": [], "true_false": []}),
             "output_path": str(tmp_path / "out.json")
         })
         
@@ -285,11 +293,12 @@ class TestSaveQuestionsJsonTool:
         
         assert "Saved 1 questions" in result
         
-        # Verify content is only multiple choice (as list)
+        # Verify content is only multiple choice (as dict with empty true_false)
         content = json.loads(output_path.read_text(encoding="utf-8"))
-        assert isinstance(content, list)
-        assert len(content) == 1
-        assert "options" in content[0]
+        assert isinstance(content, dict)
+        assert len(content["multiple_choice"]) == 1
+        assert len(content["true_false"]) == 0
+        assert "options" in content["multiple_choice"][0]
     
     def test_save_mixed_format_extract_true_false(self, tmp_path):
         """Test extracting only true/false from mixed format."""
@@ -307,11 +316,12 @@ class TestSaveQuestionsJsonTool:
         
         assert "Saved 2 questions" in result
         
-        # Verify content is only true/false (as list)
+        # Verify content is only true/false (as dict with empty multiple_choice)
         content = json.loads(output_path.read_text(encoding="utf-8"))
-        assert isinstance(content, list)
-        assert len(content) == 2
-        assert "options" not in content[0]
+        assert isinstance(content, dict)
+        assert len(content["true_false"]) == 2
+        assert len(content["multiple_choice"]) == 0
+        assert "options" not in content["true_false"][0]
 
 
 class TestLoadQuestionsJsonTool:
@@ -320,7 +330,7 @@ class TestLoadQuestionsJsonTool:
     def test_load_valid_file(self, tmp_path):
         """Test loading a valid JSON file."""
         file_path = tmp_path / "questions.json"
-        questions = [{"title": "Q1"}, {"title": "Q2"}]
+        questions = {"multiple_choice": [{"title": "Q1"}, {"title": "Q2"}], "true_false": []}
         file_path.write_text(json.dumps(questions), encoding="utf-8")
         
         result = load_questions_json.invoke({"file_path": str(file_path)})
@@ -757,10 +767,13 @@ class TestToolsIntegration:
         """Test a complete workflow: save and load JSON."""
         from src.tools import save_questions_json, load_questions_json
         
-        questions = [
-            {"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}},
-            {"title": "Q2", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}},
-        ]
+        questions = {
+            "multiple_choice": [
+                {"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}},
+                {"title": "Q2", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}},
+            ],
+            "true_false": []
+        }
         file_path = tmp_path / "workflow.json"
         
         # Save
@@ -782,10 +795,13 @@ class TestToolsIntegration:
         """Test workflow: validate then save."""
         from src.tools import validate_questions_tool, save_questions_json
         
-        questions = [
-            {"title": "What is the capital of France?", 
-             "options": {"a": "London", "b": "Paris", "c": "Berlin", "d": "Madrid"}}
-        ]
+        questions = {
+            "multiple_choice": [
+                {"title": "What is the capital of France?", 
+                 "options": {"a": "London", "b": "Paris", "c": "Berlin", "d": "Madrid"}}
+            ],
+            "true_false": []
+        }
         
         # Validate
         validate_result = validate_questions_tool.invoke({
@@ -1038,11 +1054,12 @@ class TestExtractFunctions:
             with patch("src.tools.image_analysis.create_agent", return_value=mock_agent):
                 result = extract_multiple_choice(mock_llm, ["fake_path.png"])
         
-        assert len(result) == 2
-        assert result[0]["title"] == "What is 2+2?"
-        assert result[0]["options"]["a"] == "3"
-        assert result[0]["options"]["b"] == "4"
-        assert result[1]["title"] == "Capital of France?"
+        assert result["type"] == "multiple_choice"
+        assert len(result["multiple_choice"]) == 2
+        assert result["multiple_choice"][0]["title"] == "What is 2+2?"
+        assert result["multiple_choice"][0]["options"]["a"] == "3"
+        assert result["multiple_choice"][0]["options"]["b"] == "4"
+        assert result["multiple_choice"][1]["title"] == "Capital of France?"
     
     def test_extract_true_false(self):
         """Test extract_true_false with mocked create_agent."""
@@ -1063,9 +1080,10 @@ class TestExtractFunctions:
             with patch("src.tools.image_analysis.create_agent", return_value=mock_agent):
                 result = extract_true_false(mock_llm, ["fake_path.png"])
         
-        assert len(result) == 2
-        assert result[0]["title"] == "The sky is blue."
-        assert result[1]["title"] == "Water boils at 50°C."
+        assert result["type"] == "true_false"
+        assert len(result["true_false"]) == 2
+        assert result["true_false"][0]["title"] == "The sky is blue."
+        assert result["true_false"][1]["title"] == "Water boils at 50°C."
     
     def test_extract_mixed(self):
         """Test extract_mixed with mocked create_agent."""
@@ -1092,6 +1110,7 @@ class TestExtractFunctions:
             with patch("src.tools.image_analysis.create_agent", return_value=mock_agent):
                 result = extract_mixed(mock_llm, ["fake_path.png"])
         
+        assert result["type"] == "mixed"
         assert "multiple_choice" in result
         assert "true_false" in result
         assert len(result["multiple_choice"]) == 1
@@ -1120,6 +1139,7 @@ class TestExtractFunctions:
             with patch("src.tools.image_analysis.create_agent", return_value=mock_agent):
                 result = extract_mixed(mock_llm, ["fake_path.png"])
         
+        assert result["type"] == "mixed"
         assert len(result["multiple_choice"]) == 0
         assert len(result["true_false"]) == 1
 

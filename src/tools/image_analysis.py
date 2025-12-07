@@ -147,7 +147,7 @@ def build_image_content(image_paths: list[str]) -> list[dict]:
     return content
 
 
-def extract_multiple_choice(llm: ChatOpenAI, image_paths: list[str]) -> list[dict]:
+def extract_multiple_choice(llm: ChatOpenAI, image_paths: list[str]) -> dict:
     """Extract multiple choice questions from images using LangChain agent."""
     content = [{"type": "text", "text": "请识别以下图片中的所有选择题。"}]
     content.extend(build_image_content(image_paths))
@@ -166,21 +166,24 @@ def extract_multiple_choice(llm: ChatOpenAI, image_paths: list[str]) -> list[dic
     
     result = response["structured_response"]
     
-    return [
-        {
-            "title": q.title,
-            "options": {
-                "a": q.options.a,
-                "b": q.options.b,
-                "c": q.options.c,
-                "d": q.options.d,
+    return {
+        "type": "multiple_choice",
+        "multiple_choice": [
+            {
+                "title": q.title,
+                "options": {
+                    "a": q.options.a,
+                    "b": q.options.b,
+                    "c": q.options.c,
+                    "d": q.options.d,
+                }
             }
-        }
-        for q in result.questions
-    ]
+            for q in result.questions
+        ]
+    }
 
 
-def extract_true_false(llm: ChatOpenAI, image_paths: list[str]) -> list[dict]:
+def extract_true_false(llm: ChatOpenAI, image_paths: list[str]) -> dict:
     """Extract true/false questions from images using LangChain agent."""
     content = [{"type": "text", "text": "请识别以下图片中的所有判断题。"}]
     content.extend(build_image_content(image_paths))
@@ -199,7 +202,10 @@ def extract_true_false(llm: ChatOpenAI, image_paths: list[str]) -> list[dict]:
     
     result = response["structured_response"]
     
-    return [{"title": q.title} for q in result.questions]
+    return {
+        "type": "true_false",
+        "true_false": [{"title": q.title} for q in result.questions]
+    }
 
 
 def extract_mixed(llm: ChatOpenAI, image_paths: list[str]) -> dict:
@@ -237,6 +243,7 @@ def extract_mixed(llm: ChatOpenAI, image_paths: list[str]) -> dict:
     true_false = [{"title": q.title} for q in result.true_false_questions]
     
     return {
+        "type": "mixed",
         "multiple_choice": multiple_choice,
         "true_false": true_false
     }
@@ -302,19 +309,16 @@ def analyze_image(
         
         # Extract questions based on type
         if question_type == "multiple_choice":
-            questions = extract_multiple_choice(llm, valid_paths)
-            total_count = len(questions)
-            result_data = questions
+            result_data = extract_multiple_choice(llm, valid_paths)
+            total_count = len(result_data["multiple_choice"])
         elif question_type == "true_false":
-            questions = extract_true_false(llm, valid_paths)
-            total_count = len(questions)
-            result_data = questions
+            result_data = extract_true_false(llm, valid_paths)
+            total_count = len(result_data["true_false"])
         else:  # mixed
-            result = extract_mixed(llm, valid_paths)
-            mc_count = len(result["multiple_choice"])
-            tf_count = len(result["true_false"])
+            result_data = extract_mixed(llm, valid_paths)
+            mc_count = len(result_data["multiple_choice"])
+            tf_count = len(result_data["true_false"])
             total_count = mc_count + tf_count
-            result_data = result
         
         # Build result message
         if question_type == "mixed":

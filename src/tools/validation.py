@@ -140,7 +140,7 @@ def validate_multiple_choice_question(question: dict, index: int) -> list[dict]:
     issues.extend(validate_title(title, index))
     
     # Validate options
-    options = question.get("options", {})
+    options = question.get("options", question.get("option", {}))
     if not options:
         issues.append({
             "question_index": index,
@@ -376,7 +376,16 @@ def validate_questions_tool(
     
     # Handle single type (multiple_choice or true_false)
     if not isinstance(data, list):
-        return "Error: Questions must be a JSON array"
+        # Check if it's the unified structure
+        if isinstance(data, dict) and ("multiple_choice" in data or "true_false" in data):
+             if question_type == "multiple_choice" and "multiple_choice" in data:
+                 data = data["multiple_choice"]
+             elif question_type == "true_false" and "true_false" in data:
+                 data = data["true_false"]
+             else:
+                 return f"Error: Input data does not contain '{question_type}' questions"
+        else:
+            return "Error: Questions must be a JSON array or unified format object"
     
     if not data:
         return "Error: No questions provided. The questions array is empty."
