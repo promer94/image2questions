@@ -13,3 +13,4 @@ images
 *.jpg
 .env
 .env.*
+.langgraph_api/**

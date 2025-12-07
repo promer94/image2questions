@@ -37,6 +37,11 @@ dev = [
 [project.scripts]
 question-agent = "src.cli:main"
 
+[dependency-groups]
+dev = [
+    "langgraph-cli>=0.4.7",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

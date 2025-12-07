@@ -1,34 +1,68 @@
-# JSON to Word Tables
+# Question Extraction Agent
 
-This project creates (and extends) a Word document consisting of borderless `3×2` tables (first row merged for the title and the remaining cells for the four options labeled A→D); each title row uses Word's numbered list style so the questions stay sequential, and any numbering already present in the JSON title is dropped before applying Word's numbering.
+A LangChain-based agent for extracting questions from images into JSON and Word formats.
 
-## Setup (with `uv`)
+## Features
 
-1. Initialize or switch to the project environment (replace `myenv` if you prefer another name):
+- Extract multiple-choice and true/false questions from images
+- Save to JSON and Word formats
+- Interactive chat interface
+- Batch processing
+- Validation of extracted questions
 
-   ```powershell
-   uv env new myenv
-   uv env use myenv
+## Setup
+
+1. Install dependencies:
+   ```bash
+   uv sync
    ```
 
-2. Add the required dependency with `uv`:
-
-   ```powershell
-   uv add python-docx
-   ```
-
-3. Install dependencies (the `uv` cache will ensure the lockfile stays updated):
-
-   ```powershell
-   uv install
+2. Configure environment:
+   Copy `.env.example` to `.env` and set your API keys.
+   ```bash
+   cp .env.example .env
    ```
 
 ## Usage
 
-```powershell
-uv run python json_to_word.py sample_data.json questions.docx
+### CLI
+
+```bash
+# Interactive mode
+question-agent interactive
+
+# Extract from image
+question-agent extract image.jpg
+
+# Batch process
+question-agent batch ./images/
 ```
 
-The script expects a JSON array of `Item` objects (`title` + `options` with lowercase `a`-`d`). It writes a Word document where each table matches the described layout and all borders are disabled.
+### LangSmith Studio
 
-Custom JSON files can be passed by replacing `sample_data.json`, and the output path can be changed as needed.
+This project is configured for LangSmith Studio, a visual interface for developing and testing LangChain agents.
+
+1. Ensure you have `langgraph-cli` installed (it is included in dev dependencies):
+   ```bash
+   uv add --dev langgraph-cli
+   ```
+
+2. Configure LangSmith credentials in `.env`:
+   ```dotenv
+   LANGCHAIN_TRACING_V2=true
+   LANGCHAIN_API_KEY=your_api_key
+   LANGCHAIN_PROJECT=image2test
+   ```
+
+3. Start LangSmith Studio:
+   ```bash
+   uv run langgraph dev
+   ```
+   This will open the studio in your browser.
+
+## Project Structure
+
+- `src/agent/`: Agent logic and prompts
+- `src/tools/`: Tools for image analysis and file generation
+- `src/models/`: Pydantic models and configuration
+- `src/cli.py`: Command-line interface

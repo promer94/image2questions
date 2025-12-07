@@ -60,6 +60,7 @@ class QuestionExtractionAgent:
         system_prompt: Optional[str] = None,
         language: str = "zh",
         use_structured_output: bool = True,
+        checkpointer: Optional[object] = "default",
     ):
         """
         Initialize the Question Extraction Agent.
@@ -72,6 +73,7 @@ class QuestionExtractionAgent:
             system_prompt: Custom system prompt (defaults to built-in prompt)
             language: Language for default prompt ('zh' or 'en')
             use_structured_output: Whether to use structured output format (default True)
+            checkpointer: Checkpointer for memory (defaults to InMemorySaver, set to None to disable)
         """
         settings = get_settings()
         
@@ -92,7 +94,10 @@ class QuestionExtractionAgent:
         # Create checkpointer for short-term memory
         # InMemorySaver stores conversation history in memory
         # This enables multi-turn conversations within a session
-        self.checkpointer = InMemorySaver()
+        if checkpointer == "default":
+            self.checkpointer = InMemorySaver()
+        else:
+            self.checkpointer = checkpointer
         
         # Store structured output preference
         self.use_structured_output = use_structured_output

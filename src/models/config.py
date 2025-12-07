@@ -83,7 +83,7 @@ class Settings(BaseSettings):
         default=0.0,
         description="Temperature for agent LLM"
     )
-    
+
     # -------------------------------------------------------------------------
     # Output Configuration
     # -------------------------------------------------------------------------
