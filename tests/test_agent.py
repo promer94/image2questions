@@ -409,8 +409,8 @@ class TestToolsIntegration:
         create_call_kwargs = mock_create_agent.call_args[1]
         tools = create_call_kwargs["tools"]
         
-        # Should have 7 tools
-        assert len(tools) == 7
+        # Should have 6 tools
+        assert len(tools) == 6
     
     @patch("src.agent.agent.ChatOpenAI")
     @patch("src.agent.agent.create_agent")
