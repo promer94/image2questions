@@ -205,62 +205,9 @@ def batch_process_images(
 
 
 
-@tool
-def list_images_in_directory(
-    directory_path: str,
-    recursive: bool = False
-) -> str:
-    """List all image files in a directory.
-    
-    This tool scans a directory for image files and returns a list
-    of found images. Useful for previewing what will be processed
-    before running batch extraction.
-    
-    Args:
-        directory_path: Path to the directory to scan.
-        recursive: If True, also search in subdirectories.
-                  Default: False
-    
-    Returns:
-        A string containing the list of found images.
-    """
-    # Validate directory
-    dir_path = Path(directory_path)
-    
-    if not dir_path.exists():
-        return f"Error: Directory not found: {directory_path}"
-    
-    if not dir_path.is_dir():
-        return f"Error: Not a directory: {directory_path}"
-    
-    # Find images
-    image_paths = find_images_in_directory(dir_path, recursive)
-    
-    if not image_paths:
-        return f"No images found in {directory_path}. Supported formats: {', '.join(SUPPORTED_EXTENSIONS)}"
-    
-    # Build result
-    lines = [
-        f"Found {len(image_paths)} image(s) in {directory_path}",
-        f"Recursive: {'Yes' if recursive else 'No'}",
-        "",
-        "Images:"
-    ]
-    
-    for path in image_paths:
-        # Show relative path if possible
-        try:
-            rel_path = Path(path).relative_to(dir_path)
-            lines.append(f"  - {rel_path}")
-        except ValueError:
-            lines.append(f"  - {path}")
-    
-    return "\n".join(lines)
-
 
 # Export for convenient access
 __all__ = [
     "batch_process_images",
-    "list_images_in_directory",
     "find_images_in_directory",
 ]

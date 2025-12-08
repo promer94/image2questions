@@ -34,8 +34,6 @@ SYSTEM_PROMPT_ZH = """你是一个专业的试题提取助手。你的任务是�
 
 6. **batch_process_images** - 扫描目录并报告处理状态，分批输出待处理的图片路径，辅助批量处理，默认一次性会处理三张图片
 
-7. **list_images_in_directory** - 列出目录中的所有图片文件
-
 ## 工作流程
 
 1. 用户提供图片路径或目录
@@ -89,8 +87,6 @@ You can use the following tools to complete tasks:
    - Provide quality score
 
 6. **batch_process_images** - Scan directory and report processing status
-
-7. **list_images_in_directory** - List all image files in a directory
 
 ## Workflow
 

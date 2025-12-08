@@ -14,7 +14,6 @@ Tools:
     - save_questions_word: Save questions to Word document
     - validate_questions_tool: Validate question quality
     - batch_process_images: Process multiple images from a directory
-    - list_images_in_directory: List image files in a directory
 
 Example:
     from langchain.agents import create_agent
@@ -28,7 +27,7 @@ from .image_analysis import analyze_image
 from .json_generator import save_questions_json, load_questions_json
 from .word_generator import save_questions_word
 from .validation import validate_questions_tool
-from .batch_processor import batch_process_images, list_images_in_directory
+from .batch_processor import batch_process_images
 
 # Also export result models for programmatic use
 from .base import (
@@ -64,7 +63,6 @@ def get_all_tools() -> list:
         save_questions_word,
         validate_questions_tool,
         batch_process_images,
-        list_images_in_directory,
     ]
 
 
@@ -77,7 +75,6 @@ def get_extraction_tools() -> list:
     return [
         analyze_image,
         batch_process_images,
-        list_images_in_directory,
     ]
 
 
@@ -113,7 +110,6 @@ __all__ = [
     "save_questions_word",
     "validate_questions_tool",
     "batch_process_images",
-    "list_images_in_directory",
     # Tool getters
     "get_all_tools",
     "get_extraction_tools",

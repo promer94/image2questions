@@ -801,12 +801,11 @@ class TestToolsIntegration:
             save_questions_word,
             validate_questions_tool,
             batch_process_images,
-            list_images_in_directory,
             get_all_tools,
         )
         
         tools = get_all_tools()
-        assert len(tools) == 7
+        assert len(tools) == 6
     
     def test_tool_has_name_and_description(self):
         """Test that tools have proper names and descriptions."""
