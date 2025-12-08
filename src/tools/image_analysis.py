@@ -174,7 +174,8 @@ def extract_multiple_choice(llm: ChatOpenAI, image_paths: list[str]) -> dict:
                     "b": q.options.b,
                     "c": q.options.c,
                     "d": q.options.d,
-                }
+                },
+                "source_image": image_paths,
             }
             for q in result.questions
         ]
@@ -202,7 +203,7 @@ def extract_true_false(llm: ChatOpenAI, image_paths: list[str]) -> dict:
     
     return {
         "type": "true_false",
-        "true_false": [{"title": q.title} for q in result.questions]
+        "true_false": [{"title": q.title, "source_image": image_paths} for q in result.questions]
     }
 
 
@@ -233,12 +234,13 @@ def extract_mixed(llm: ChatOpenAI, image_paths: list[str]) -> dict:
                 "b": q.options.b,
                 "c": q.options.c,
                 "d": q.options.d,
-            }
+            },
+            "source_image": image_paths,
         }
         for q in result.multiple_choice_questions
     ]
     
-    true_false = [{"title": q.title} for q in result.true_false_questions]
+    true_false = [{"title": q.title, "source_image": image_paths} for q in result.true_false_questions]
     
     return {
         "type": "mixed",

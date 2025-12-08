@@ -46,6 +46,10 @@ from .prompts import (
     SYSTEM_PROMPT_ZH,
     SYSTEM_PROMPT_EN,
 )
+from .middleware import (
+    ContextCleanupMiddleware,
+    BatchProcessingContextMiddleware,
+)
 
 __all__ = [
     # Agent class
@@ -58,4 +62,7 @@ __all__ = [
     "SYSTEM_PROMPT",
     "SYSTEM_PROMPT_ZH",
     "SYSTEM_PROMPT_EN",
+    # Middleware
+    "ContextCleanupMiddleware",
+    "BatchProcessingContextMiddleware",
 ]

@@ -189,10 +189,6 @@ def batch_process_images(
     for path in next_batch:
         lines.append(f"- {path}")
         
-    remaining_count = len(result.unprocessed_images) - len(next_batch)
-    if remaining_count > 0:
-        lines.append(f"... and {remaining_count} more pending images not shown.")
-        
     if not result.unprocessed_images:
         lines.append("(None - All images processed!)")
         

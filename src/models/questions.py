@@ -51,6 +51,10 @@ class QuestionBase(BaseModel):
         default=None,
         description="Additional metadata (difficulty, category, source, etc.)"
     )
+    source_image: list[str] = Field(
+        default_factory=list,
+        description="List of source images for this question"
+    )
 
     @field_validator("title")
     @classmethod

@@ -25,6 +25,7 @@ from ..models.config import get_settings
 from ..models.questions import AgentResponse
 from ..tools import get_all_tools
 from .prompts import get_system_prompt, SYSTEM_PROMPT
+from .middleware import BatchProcessingContextMiddleware, ContextCleanupMiddleware
 
 
 class QuestionExtractionAgent:
@@ -109,16 +110,11 @@ class QuestionExtractionAgent:
 
         # Configure middleware to manage context window
         # ClearToolUsesEdit removes old tool outputs to save tokens
+        # ContextCleanupMiddleware removes specific tool messages after checkpoints:
+        #   - Remove analyze_image messages after save_questions_json
+        #   - Remove save_questions_json messages after batch_process_images
         middleware = [
-            ContextEditingMiddleware(
-                edits=[
-                    ClearToolUsesEdit(
-                        clear_tool_inputs=True,
-                        trigger=8192,  # Trigger cleanup when context exceeds 6000 tokens
-                        keep=3,        # Keep most recent tool outputs
-                    ),
-                ],
-            ),
+           BatchProcessingContextMiddleware(keep_recent=1)  # Custom middleware for targeted cleanup
         ]
         
         # Create the agent using LangChain's create_agent

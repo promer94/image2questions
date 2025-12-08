@@ -1114,7 +1114,9 @@ class TestExtractFunctions:
         assert result["multiple_choice"][0]["title"] == "What is 2+2?"
         assert result["multiple_choice"][0]["options"]["a"] == "3"
         assert result["multiple_choice"][0]["options"]["b"] == "4"
+        assert result["multiple_choice"][0]["source_image"] == ["fake_path.png"]
         assert result["multiple_choice"][1]["title"] == "Capital of France?"
+        assert result["multiple_choice"][1]["source_image"] == ["fake_path.png"]
     
     def test_extract_true_false(self):
         """Test extract_true_false with mocked create_agent."""
@@ -1138,7 +1140,9 @@ class TestExtractFunctions:
         assert result["type"] == "true_false"
         assert len(result["true_false"]) == 2
         assert result["true_false"][0]["title"] == "The sky is blue."
+        assert result["true_false"][0]["source_image"] == ["fake_path.png"]
         assert result["true_false"][1]["title"] == "Water boils at 50°C."
+        assert result["true_false"][1]["source_image"] == ["fake_path.png"]
     
     def test_extract_mixed(self):
         """Test extract_mixed with mocked create_agent."""
@@ -1172,8 +1176,11 @@ class TestExtractFunctions:
         assert len(result["true_false"]) == 2
         assert result["multiple_choice"][0]["title"] == "What is 2+2?"
         assert result["multiple_choice"][0]["options"]["b"] == "4"
+        assert result["multiple_choice"][0]["source_image"] == ["fake_path.png"]
         assert result["true_false"][0]["title"] == "The sky is blue."
+        assert result["true_false"][0]["source_image"] == ["fake_path.png"]
         assert result["true_false"][1]["title"] == "Fire is cold."
+        assert result["true_false"][1]["source_image"] == ["fake_path.png"]
     
     def test_extract_mixed_empty_one_type(self):
         """Test extract_mixed when one type has no questions."""
