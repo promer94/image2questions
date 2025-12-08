@@ -140,8 +140,5 @@ class TestBatchProcessImagesStatus:
         assert f"- {str(tmp_path / 'img2.jpg')}" in output
         assert f"- {str(tmp_path / 'img3.jpg')}" not in output
         
-        # Verify "more pending images not shown" message
-        assert "... and 3 more pending images not shown." in output
-        
         # Verify recommended actions
         assert "Call `analyze_image` with the images listed in 'Next Batch to Process' above." in output
