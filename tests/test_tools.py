@@ -323,6 +323,61 @@ class TestSaveQuestionsJsonTool:
         assert len(content["multiple_choice"]) == 0
         assert "options" not in content["true_false"][0]
 
+    def test_save_with_processed_images(self, tmp_path):
+        """Test saving questions with processed images list."""
+        questions = {
+            "multiple_choice": [{"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}}],
+            "true_false": []
+        }
+        output_path = tmp_path / "processed.json"
+        processed_images = ["/path/to/img1.jpg", "/path/to/img2.jpg"]
+        
+        result = save_questions_json.invoke({
+            "questions_json": json.dumps(questions),
+            "output_path": str(output_path),
+            "processed_images": processed_images
+        })
+        
+        assert "Saved 1 questions" in result
+        
+        # Verify content
+        content = json.loads(output_path.read_text(encoding="utf-8"))
+        assert "processed_images" in content
+        assert len(content["processed_images"]) == 2
+        assert "/path/to/img1.jpg" in content["processed_images"]
+
+    def test_append_with_processed_images(self, tmp_path):
+        """Test appending questions and merging processed images."""
+        output_path = tmp_path / "append_processed.json"
+        
+        # Initial save
+        initial = {
+            "multiple_choice": [{"title": "Q1"}], 
+            "true_false": [],
+            "processed_images": ["img1.jpg"]
+        }
+        output_path.write_text(json.dumps(initial), encoding="utf-8")
+        
+        # Append
+        additional = {"multiple_choice": [{"title": "Q2"}], "true_false": []}
+        new_images = ["img2.jpg", "img1.jpg"] # img1.jpg is duplicate
+        
+        result = save_questions_json.invoke({
+            "questions_json": json.dumps(additional),
+            "output_path": str(output_path),
+            "append": True,
+            "processed_images": new_images
+        })
+        
+        assert "Appended" in result
+        
+        # Verify content
+        content = json.loads(output_path.read_text(encoding="utf-8"))
+        assert len(content["multiple_choice"]) == 2
+        assert len(content["processed_images"]) == 2 # Should be unique
+        assert "img1.jpg" in content["processed_images"]
+        assert "img2.jpg" in content["processed_images"]
+
 
 class TestLoadQuestionsJsonTool:
     """Tests for the load_questions_json tool."""
@@ -903,8 +958,8 @@ class TestImageAnalysisHelpers:
         content = build_image_content([str(image_path)])
         
         assert len(content) == 1
-        assert content[0]["type"] == "image_url"
-        assert "data:image/png;base64," in content[0]["image_url"]["url"]
+        assert content[0]["type"] == "input_image"
+        assert "data:image/png;base64," in content[0]["image_url"]
 
 
 class TestImageAnalysisPydanticModels:

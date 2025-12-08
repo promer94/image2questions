@@ -59,11 +59,14 @@ class ValidationResult(BaseModel):
 
 class BatchProcessingResult(BaseModel):
     """Result from batch processing tool."""
-    success: bool = Field(description="Whether batch processing was successful")
-    total_images: int = Field(default=0, description="Total images processed")
-    total_questions: int = Field(default=0, description="Total questions extracted")
-    successful_images: int = Field(default=0, description="Successfully processed images")
-    failed_images: int = Field(default=0, description="Failed images")
-    questions: list[dict] = Field(default_factory=list, description="All extracted questions")
+    status: str = Field(description="Status of the batch processing (e.g., 'completed', 'in_progress', 'failed')")
+    total_images: int = Field(default=0, description="Total images discovered")
+    total_questions: int = Field(default=0, description="Total questions extracted and saved")
+    successful_images: int = Field(default=0, description="Images processed successfully")
+    failed_images: int = Field(default=0, description="Images that failed during processing")
+    failed_image_paths: list[str] = Field(default_factory=list, description="Paths of images that failed during processing")
+    processed_images: list[str] = Field(default_factory=list, description="All processed image paths")
+    unprocessed_images: list[str] = Field(default_factory=list, description="Images not attempted or skipped")
+    result_files: list[str] = Field(default_factory=list, description="JSON files created by the batch run")
     errors: list[str] = Field(default_factory=list, description="Error messages from failed images")
     error: str | None = Field(default=None, description="Overall error message if failed")

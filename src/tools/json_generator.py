@@ -110,7 +110,8 @@ def save_questions_json(
     output_path: str,
     append: bool = False,
     pretty: bool = True,
-    question_type: str = "auto"
+    question_type: str = "auto",
+    processed_images: list[str] | None = None
 ) -> str:
     """Save extracted questions to a JSON file.
     
@@ -129,6 +130,8 @@ def save_questions_json(
                       - "auto": Save all questions (for mixed, save as mixed format)
                       - "multiple_choice": Extract only multiple choice questions
                       - "true_false": Extract only true/false questions
+        processed_images: List of image paths that were processed to generate these questions.
+                         These will be added to the 'processed_images' field in the output.
     
     Returns:
         A string describing the result of the operation.
@@ -151,6 +154,10 @@ def save_questions_json(
     if not questions.get("multiple_choice") and not questions.get("true_false"):
         return "Error: No questions provided. Both arrays are empty."
     
+    # Add processed images if provided
+    if processed_images:
+        questions["processed_images"] = processed_images
+
     # Convert to Path object
     file_path = Path(output_path)
     
@@ -173,6 +180,15 @@ def save_questions_json(
             "true_false": existing.get("true_false", []) + questions.get("true_false", [])
         }
         
+        # Merge processed images
+        existing_images = existing.get("processed_images", [])
+        new_images = questions.get("processed_images", [])
+        if existing_images or new_images:
+            # Use set to avoid duplicates, but keep order if possible? 
+            # Sets don't keep order. Let's just append and unique-ify.
+            all_images = existing_images + [img for img in new_images if img not in existing_images]
+            combined["processed_images"] = all_images
+
         # Preserve type if present
         if "type" in existing:
             combined["type"] = existing["type"]

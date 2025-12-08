@@ -16,6 +16,7 @@ import uuid
 from typing import Optional, Union
 
 from langchain.agents import create_agent
+from langchain.agents.middleware import ContextEditingMiddleware, ClearToolUsesEdit
 from langchain.agents.structured_output import ToolStrategy
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
@@ -105,6 +106,20 @@ class QuestionExtractionAgent:
         
         # Store structured output preference
         self.use_structured_output = use_structured_output
+
+        # Configure middleware to manage context window
+        # ClearToolUsesEdit removes old tool outputs to save tokens
+        middleware = [
+            ContextEditingMiddleware(
+                edits=[
+                    ClearToolUsesEdit(
+                        clear_tool_inputs=True,
+                        trigger=8192,  # Trigger cleanup when context exceeds 6000 tokens
+                        keep=3,        # Keep most recent tool outputs
+                    ),
+                ],
+            ),
+        ]
         
         # Create the agent using LangChain's create_agent
         # This builds a ReAct agent that runs on LangGraph
@@ -114,6 +129,7 @@ class QuestionExtractionAgent:
             "tools": self.tools,
             "system_prompt": self.system_prompt,
             "checkpointer": self.checkpointer,
+            "middleware": middleware,
         }
         
         if use_structured_output:
