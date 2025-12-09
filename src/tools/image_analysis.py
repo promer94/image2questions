@@ -134,7 +134,6 @@ def validate_image_paths(image_paths: list[str]) -> tuple[list[str], list[str]]:
 def save_questions_to_json(
     questions: dict,
     output_path: Path,
-    append: bool = False,
     pretty: bool = True
 ) -> tuple[bool, str]:
     """Save questions to a JSON file.
@@ -142,7 +141,6 @@ def save_questions_to_json(
     Args:
         questions: Question dictionary
         output_path: Path to save the JSON file
-        append: If True, append to existing file
         pretty: Whether to format with indentation
         
     Returns:
@@ -153,20 +151,19 @@ def save_questions_to_json(
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
         # Handle append mode
-        if append and output_path.exists():
+        if output_path.exists():
             existing, error = load_existing_questions(output_path)
             if error:
                 return False, f"Error loading existing file: {error}"
             
-            # Merge existing and new questions
-            questions = {
-                "multiple_choice": existing.get("multiple_choice", []) + questions.get("multiple_choice", []),
-                "true_false": existing.get("true_false", []) + questions.get("true_false", [])
-            }
-            
             # Merge processed images
             existing_images = existing.get("processed_images", [])
             new_images = questions.get("processed_images", [])
+            # Merge existing and new questions
+            questions = {
+                "multiple_choice": existing.get("multiple_choice", []) + questions.get("multiple_choice", []),
+                "true_false": existing.get("true_false", []) + questions.get("true_false", []),
+            }
             if existing_images or new_images:
                 all_images = existing_images + [img for img in new_images if img not in existing_images]
                 questions["processed_images"] = all_images
@@ -319,8 +316,7 @@ def extract_mixed(llm: ChatOpenAI, image_paths: list[str]) -> dict:
 def analyze_image(
     image_paths: str,
     output_path: str,
-    question_type: str = "multiple_choice",
-    append: bool = False
+    question_type: str = "mixed"
 ) -> str:
     """Extract questions from images using vision AI and save to JSON file.
     
@@ -334,11 +330,9 @@ def analyze_image(
         output_path: File path where the JSON will be saved.
                     Will create parent directories if needed.
         question_type: Type of questions to extract. Must be one of:
+                      - "mixed": Both multiple choice and true/false questions
                       - "multiple_choice": Questions with options A, B, C, D
                       - "true_false": Statement questions for true/false judgment
-                      - "mixed": Both multiple choice and true/false questions
-        append: If True, append questions to existing file.
-               If False, overwrite existing file. Default: False
     
     Returns:
         A string containing the extraction result with:
@@ -398,7 +392,7 @@ def analyze_image(
         result_data["processed_images"] = valid_paths
         
         # Save to JSON file
-        success, save_message = save_questions_to_json(result_data, file_path, append=append)
+        success, save_message = save_questions_to_json(result_data, file_path)
         
         if not success:
             return f"Extraction succeeded but failed to save: {save_message}"
@@ -416,6 +410,11 @@ def analyze_image(
                 f"Source images: {len(valid_paths)}",
                 save_message,
             ]
+        
+        # Add processed image paths to output
+        result_lines.append("Processed image paths:")
+        for i, img_path in enumerate(valid_paths, 1):
+            result_lines.append(f"  {i}. {img_path}")
         
         if errors:
             result_lines.append(f"Warnings: {len(errors)} image(s) could not be processed")

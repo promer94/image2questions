@@ -116,8 +116,8 @@ class QuestionExtractionAgent:
            ContextEditingMiddleware(
             edits=[
                 ClearToolUsesEdit(
-                    trigger=8192,
-                    keep=8,
+                    trigger=4096,
+                    keep=4,
                     clear_tool_inputs=True
                 ),
             ],

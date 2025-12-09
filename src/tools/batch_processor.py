@@ -57,7 +57,7 @@ def batch_process_images(
     directory_path: str,
     recursive: bool = False,
     output_path: str | None = None,
-    batch_size: int = 3,
+    batch_size: int = 2,
 ) -> str:
     """Scan a directory for images and report processing status.
     
@@ -71,7 +71,7 @@ def batch_process_images(
         recursive: If True, also search in subdirectories.
         output_path: Path to the JSON file where questions are/will be saved.
                     Default: {directory_path}/questions.json
-        batch_size: Recommended batch size for processing. Default: 3
+        batch_size: Recommended batch size for processing. Default: 2
     
     Returns:
         A status report including:
