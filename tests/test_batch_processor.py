@@ -1,5 +1,6 @@
 
 import pytest
+import os
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from src.tools.batch_processor import batch_process_images
@@ -50,6 +51,49 @@ class TestBatchProcessImagesStatus:
             # Verify BatchProcessingResult was initialized with status="completed"
             call_args = mock_result_cls.call_args[1]
             assert call_args["status"] == "completed"
+
+    def test_status_completed_relative_paths(self, tmp_path, mock_find_images, mock_load_existing):
+        # Setup: 2 images found (absolute paths returned by find_images)
+        abs_img1 = str(tmp_path / "img1.jpg")
+        abs_img2 = str(tmp_path / "img2.jpg")
+        mock_find_images.return_value = [abs_img1, abs_img2]
+        
+        # Mock existing questions with RELATIVE paths in processed_images
+        # This simulates a questions.json created with relative paths
+        mock_load_existing.return_value = (
+            {
+                "multiple_choice": [], 
+                "true_false": [], 
+                "processed_images": ["img1.jpg", "img2.jpg"]
+            }, 
+            None
+        )
+        
+        # Create dummy file so it exists
+        (tmp_path / "questions.json").touch()
+        
+        # Change CWD to tmp_path so relative paths resolve correctly
+        cwd = os.getcwd()
+        os.chdir(tmp_path)
+        try:
+            with patch("src.tools.batch_processor.BatchProcessingResult") as mock_result_cls:
+                mock_instance = MagicMock()
+                mock_instance.total_images = 2
+                mock_instance.processed_images = [abs_img1, abs_img2]
+                mock_instance.unprocessed_images = []
+                mock_result_cls.return_value = mock_instance
+                
+                batch_process_images.invoke({
+                    "directory_path": str(tmp_path),
+                    "recursive": False
+                })
+                
+                # Verify BatchProcessingResult was initialized with status="completed"
+                call_args = mock_result_cls.call_args[1]
+                assert call_args["status"] == "completed"
+                assert len(call_args["unprocessed_images"]) == 0
+        finally:
+            os.chdir(cwd)
 
     def test_status_pending(self, tmp_path, mock_find_images, mock_load_existing):
         # Setup: 2 images found, none processed
@@ -142,3 +186,19 @@ class TestBatchProcessImagesStatus:
         
         # Verify recommended actions
         assert "Call `analyze_image` with the images listed in 'Next Batch to Process' above." in output
+
+    def test_corrupted_json_file(self, tmp_path, mock_find_images, mock_load_existing):
+        # Setup: 1 image found
+        mock_find_images.return_value = [str(tmp_path / "img1.jpg")]
+        
+        # Mock load_existing to return error
+        mock_load_existing.return_value = (None, "JSONDecodeError")
+        
+        (tmp_path / "questions.json").touch()
+        
+        output = batch_process_images.invoke({
+            "directory_path": str(tmp_path),
+            "recursive": False
+        })
+        
+        assert "Error reading file: JSONDecodeError" in output
