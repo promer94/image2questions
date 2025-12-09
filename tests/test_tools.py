@@ -805,7 +805,7 @@ class TestToolsIntegration:
         )
         
         tools = get_all_tools()
-        assert len(tools) == 6
+        assert len(tools) == 4
     
     def test_tool_has_name_and_description(self):
         """Test that tools have proper names and descriptions."""

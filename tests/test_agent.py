@@ -410,7 +410,7 @@ class TestToolsIntegration:
         tools = create_call_kwargs["tools"]
         
         # Should have 6 tools
-        assert len(tools) == 6
+        assert len(tools) == 4
     
     @patch("src.agent.agent.ChatOpenAI")
     @patch("src.agent.agent.create_agent")

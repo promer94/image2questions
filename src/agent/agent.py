@@ -25,7 +25,7 @@ from ..models.config import get_settings
 from ..models.questions import AgentResponse
 from ..tools import get_all_tools
 from .prompts import get_system_prompt, SYSTEM_PROMPT
-from .middleware import BatchProcessingContextMiddleware, ContextCleanupMiddleware
+
 
 
 class QuestionExtractionAgent:
@@ -85,10 +85,10 @@ class QuestionExtractionAgent:
             api_key=api_key or settings.effective_agent_api_key,
             base_url=base_url or settings.agent_base_url,
             temperature=temperature if temperature is not None else settings.agent_temperature,
-            use_responses_api=True,
+            ###use_responses_api=True,
             ### workaroud https://github.com/langchain-ai/langchain/issues/34124#issuecomment-3586763122
-            output_version="responses/v1",
-            use_previous_response_id=True
+            ###output_version="responses/v1",
+            ###use_previous_response_id=True
         )
         
         # Get tools
@@ -114,7 +114,15 @@ class QuestionExtractionAgent:
         #   - Remove analyze_image messages after save_questions_json
         #   - Remove save_questions_json messages after batch_process_images
         middleware = [
-           ### BatchProcessingContextMiddleware(keep_recent=1)  # Custom middleware for targeted cleanup
+           ContextEditingMiddleware(
+            edits=[
+                ClearToolUsesEdit(
+                    trigger=8192,
+                    keep=8,
+                    clear_tool_inputs=True
+                ),
+            ],
+          )
         ]
         
         # Create the agent using LangChain's create_agent

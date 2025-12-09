@@ -24,8 +24,7 @@ Example:
 """
 
 from .image_analysis import analyze_image
-from .json_generator import save_questions_json, load_questions_json
-from .word_generator import save_questions_word
+from .json_generator import save_questions_json
 from .validation import validate_questions_tool
 from .batch_processor import batch_process_images
 
@@ -59,8 +58,6 @@ def get_all_tools() -> list:
     return [
         analyze_image,
         save_questions_json,
-        load_questions_json,
-        save_questions_word,
         validate_questions_tool,
         batch_process_images,
     ]
@@ -86,8 +83,6 @@ def get_output_tools() -> list:
     """
     return [
         save_questions_json,
-        load_questions_json,
-        save_questions_word,
     ]
 
 
@@ -106,8 +101,6 @@ __all__ = [
     # Main tools
     "analyze_image",
     "save_questions_json",
-    "load_questions_json",
-    "save_questions_word",
     "validate_questions_tool",
     "batch_process_images",
     # Tool getters
