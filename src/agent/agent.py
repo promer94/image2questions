@@ -85,10 +85,9 @@ class QuestionExtractionAgent:
             api_key=api_key or settings.effective_agent_api_key,
             base_url=base_url or settings.agent_base_url,
             temperature=temperature if temperature is not None else settings.agent_temperature,
-            ###use_responses_api=True,
             ### workaroud https://github.com/langchain-ai/langchain/issues/34124#issuecomment-3586763122
-            ###output_version="responses/v1",
-            ###use_previous_response_id=True
+            use_responses_api=True,
+            use_previous_response_id=True
         )
         
         # Get tools
