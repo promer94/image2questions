@@ -13,12 +13,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.tools.json_generator import (
-    parse_questions_input,
+from src.tools.image_analysis import (
     load_existing_questions,
     save_questions_to_json,
-    save_questions_json,
-    load_questions_json,
 )
 from src.tools.validation import (
     validate_title,
@@ -52,60 +49,6 @@ from src.tools.image_analysis import (
 
 
 # ==================== JSON Generator Tests ====================
-
-class TestParseQuestionsInput:
-    """Tests for parse_questions_input function."""
-    
-    def test_valid_json_array(self):
-        """Test that JSON array is rejected."""
-        input_json = '[{"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}}]'
-        questions, error = parse_questions_input(input_json)
-        assert questions == {}
-        assert "JSON object" in error
-    
-    def test_empty_array(self):
-        """Test that empty array is rejected."""
-        questions, error = parse_questions_input("[]")
-        assert questions == {}
-        assert "JSON object" in error
-    
-    def test_invalid_json(self):
-        """Test parsing invalid JSON."""
-        questions, error = parse_questions_input("not json")
-        assert questions == {}
-        assert "Invalid JSON" in error
-    
-    def test_json_object_instead_of_array(self):
-        """Test that non-mixed JSON objects are rejected."""
-        questions, error = parse_questions_input('{"title": "Q1"}')
-        assert questions == {}
-        assert "must contain 'multiple_choice' or 'true_false' keys" in error
-    
-    def test_mixed_format(self):
-        """Test parsing mixed format from image analysis."""
-        input_json = '{"multiple_choice": [{"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}}], "true_false": [{"title": "Q2"}]}'
-        data, error = parse_questions_input(input_json)
-        assert error is None
-        assert isinstance(data, dict)
-        assert len(data["multiple_choice"]) == 1
-        assert len(data["true_false"]) == 1
-    
-    def test_mixed_format_only_multiple_choice(self):
-        """Test parsing mixed format with only multiple choice."""
-        input_json = '{"multiple_choice": [{"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}}]}'
-        data, error = parse_questions_input(input_json)
-        assert error is None
-        assert isinstance(data, dict)
-        assert len(data["multiple_choice"]) == 1
-    
-    def test_mixed_format_only_true_false(self):
-        """Test parsing mixed format with only true/false."""
-        input_json = '{"true_false": [{"title": "Q1"}]}'
-        data, error = parse_questions_input(input_json)
-        assert error is None
-        assert isinstance(data, dict)
-        assert len(data["true_false"]) == 1
-
 
 class TestSaveQuestionsToJson:
     """Tests for save_questions_to_json function."""
@@ -179,229 +122,6 @@ class TestLoadExistingQuestions:
         
         assert questions == {}
         assert "invalid JSON" in error
-
-
-class TestSaveQuestionsJsonTool:
-    """Tests for the save_questions_json tool."""
-    
-    def test_save_multiple_choice(self, tmp_path):
-        """Test saving multiple choice questions."""
-        questions = {
-            "multiple_choice": [{"title": "What is 2+2?", "options": {"a": "3", "b": "4", "c": "5", "d": "6"}}],
-            "true_false": []
-        }
-        output_path = tmp_path / "mc.json"
-        
-        result = save_questions_json.invoke({
-            "questions_json": json.dumps(questions),
-            "output_path": str(output_path)
-        })
-        
-        assert "Saved 1 questions" in result
-        assert output_path.exists()
-    
-    def test_save_true_false(self, tmp_path):
-        """Test saving true/false questions."""
-        questions = {
-            "multiple_choice": [],
-            "true_false": [{"title": "The sky is blue."}]
-        }
-        output_path = tmp_path / "tf.json"
-        
-        result = save_questions_json.invoke({
-            "questions_json": json.dumps(questions),
-            "output_path": str(output_path)
-        })
-        
-        assert "Saved 1 questions" in result
-    
-    def test_append_mode(self, tmp_path):
-        """Test appending to existing file."""
-        output_path = tmp_path / "append.json"
-        
-        # Save initial questions
-        initial = {"multiple_choice": [{"title": "Q1"}], "true_false": []}
-        output_path.write_text(json.dumps(initial), encoding="utf-8")
-        
-        # Append more questions
-        additional = {"multiple_choice": [{"title": "Q2"}], "true_false": []}
-        result = save_questions_json.invoke({
-            "questions_json": json.dumps(additional),
-            "output_path": str(output_path),
-            "append": True
-        })
-        
-        assert "Appended" in result
-        
-        # Verify combined content
-        content = json.loads(output_path.read_text(encoding="utf-8"))
-        assert len(content["multiple_choice"]) == 2
-    
-    def test_error_invalid_json(self, tmp_path):
-        """Test error handling for invalid JSON."""
-        result = save_questions_json.invoke({
-            "questions_json": "not json",
-            "output_path": str(tmp_path / "out.json")
-        })
-        
-        assert "Error" in result
-    
-    def test_error_empty_questions(self, tmp_path):
-        """Test error handling for empty questions."""
-        result = save_questions_json.invoke({
-            "questions_json": json.dumps({"multiple_choice": [], "true_false": []}),
-            "output_path": str(tmp_path / "out.json")
-        })
-        
-        assert "Error" in result
-        assert "empty" in result.lower()
-    
-    def test_save_mixed_format(self, tmp_path):
-        """Test saving mixed format from image analysis."""
-        mixed_data = {
-            "multiple_choice": [{"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}}],
-            "true_false": [{"title": "Q2"}]
-        }
-        output_path = tmp_path / "mixed.json"
-        
-        result = save_questions_json.invoke({
-            "questions_json": json.dumps(mixed_data),
-            "output_path": str(output_path)
-        })
-        
-        assert "Saved 2 questions" in result
-        assert output_path.exists()
-        
-        # Verify content preserves mixed format
-        content = json.loads(output_path.read_text(encoding="utf-8"))
-        assert "multiple_choice" in content
-        assert "true_false" in content
-    
-    def test_save_mixed_format_extract_multiple_choice(self, tmp_path):
-        """Test extracting only multiple choice from mixed format."""
-        mixed_data = {
-            "multiple_choice": [{"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}}],
-            "true_false": [{"title": "Q2"}]
-        }
-        output_path = tmp_path / "mc_only.json"
-        
-        result = save_questions_json.invoke({
-            "questions_json": json.dumps(mixed_data),
-            "output_path": str(output_path),
-            "question_type": "multiple_choice"
-        })
-        
-        assert "Saved 1 questions" in result
-        
-        # Verify content is only multiple choice (as dict with empty true_false)
-        content = json.loads(output_path.read_text(encoding="utf-8"))
-        assert isinstance(content, dict)
-        assert len(content["multiple_choice"]) == 1
-        assert len(content["true_false"]) == 0
-        assert "options" in content["multiple_choice"][0]
-    
-    def test_save_mixed_format_extract_true_false(self, tmp_path):
-        """Test extracting only true/false from mixed format."""
-        mixed_data = {
-            "multiple_choice": [{"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}}],
-            "true_false": [{"title": "Q2"}, {"title": "Q3"}]
-        }
-        output_path = tmp_path / "tf_only.json"
-        
-        result = save_questions_json.invoke({
-            "questions_json": json.dumps(mixed_data),
-            "output_path": str(output_path),
-            "question_type": "true_false"
-        })
-        
-        assert "Saved 2 questions" in result
-        
-        # Verify content is only true/false (as dict with empty multiple_choice)
-        content = json.loads(output_path.read_text(encoding="utf-8"))
-        assert isinstance(content, dict)
-        assert len(content["true_false"]) == 2
-        assert len(content["multiple_choice"]) == 0
-        assert "options" not in content["true_false"][0]
-
-    def test_save_with_processed_images(self, tmp_path):
-        """Test saving questions with processed images list."""
-        questions = {
-            "multiple_choice": [{"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}}],
-            "true_false": []
-        }
-        output_path = tmp_path / "processed.json"
-        processed_images = ["/path/to/img1.jpg", "/path/to/img2.jpg"]
-        
-        result = save_questions_json.invoke({
-            "questions_json": json.dumps(questions),
-            "output_path": str(output_path),
-            "processed_images": processed_images
-        })
-        
-        assert "Saved 1 questions" in result
-        
-        # Verify content
-        content = json.loads(output_path.read_text(encoding="utf-8"))
-        assert "processed_images" in content
-        assert len(content["processed_images"]) == 2
-        assert "/path/to/img1.jpg" in content["processed_images"]
-
-    def test_append_with_processed_images(self, tmp_path):
-        """Test appending questions and merging processed images."""
-        output_path = tmp_path / "append_processed.json"
-        
-        # Initial save
-        initial = {
-            "multiple_choice": [{"title": "Q1"}], 
-            "true_false": [],
-            "processed_images": ["img1.jpg"]
-        }
-        output_path.write_text(json.dumps(initial), encoding="utf-8")
-        
-        # Append
-        additional = {"multiple_choice": [{"title": "Q2"}], "true_false": []}
-        new_images = ["img2.jpg", "img1.jpg"] # img1.jpg is duplicate
-        
-        result = save_questions_json.invoke({
-            "questions_json": json.dumps(additional),
-            "output_path": str(output_path),
-            "append": True,
-            "processed_images": new_images
-        })
-        
-        assert "Appended" in result
-        
-        # Verify content
-        content = json.loads(output_path.read_text(encoding="utf-8"))
-        assert len(content["multiple_choice"]) == 2
-        assert len(content["processed_images"]) == 2 # Should be unique
-        assert "img1.jpg" in content["processed_images"]
-        assert "img2.jpg" in content["processed_images"]
-
-
-class TestLoadQuestionsJsonTool:
-    """Tests for the load_questions_json tool."""
-    
-    def test_load_valid_file(self, tmp_path):
-        """Test loading a valid JSON file."""
-        file_path = tmp_path / "questions.json"
-        questions = {"multiple_choice": [{"title": "Q1"}, {"title": "Q2"}], "true_false": []}
-        file_path.write_text(json.dumps(questions), encoding="utf-8")
-        
-        result = load_questions_json.invoke({"file_path": str(file_path)})
-        
-        assert "Loaded 2 questions" in result
-        assert "Q1" in result
-        assert "Q2" in result
-    
-    def test_load_nonexistent_file(self, tmp_path):
-        """Test loading a non-existent file."""
-        result = load_questions_json.invoke({
-            "file_path": str(tmp_path / "nonexistent.json")
-        })
-        
-        assert "Error" in result
-        assert "not found" in result.lower()
 
 
 # ==================== Validation Tests ====================
@@ -796,16 +516,13 @@ class TestToolsIntegration:
         """Test that all tools can be imported."""
         from src.tools import (
             analyze_image,
-            save_questions_json,
-            load_questions_json,
-            save_questions_word,
             validate_questions_tool,
             batch_process_images,
             get_all_tools,
         )
         
         tools = get_all_tools()
-        assert len(tools) == 4
+        assert len(tools) == 3
     
     def test_tool_has_name_and_description(self):
         """Test that tools have proper names and descriptions."""
@@ -817,38 +534,10 @@ class TestToolsIntegration:
             assert tool.name
             assert tool.description
     
-    def test_workflow_json_save_and_load(self, tmp_path):
-        """Test a complete workflow: save and load JSON."""
-        from src.tools import save_questions_json, load_questions_json
-        
-        questions = {
-            "multiple_choice": [
-                {"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}},
-                {"title": "Q2", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}},
-            ],
-            "true_false": []
-        }
-        file_path = tmp_path / "workflow.json"
-        
-        # Save
-        save_result = save_questions_json.invoke({
-            "questions_json": json.dumps(questions),
-            "output_path": str(file_path)
-        })
-        assert "Saved 2 questions" in save_result
-        
-        # Load
-        load_result = load_questions_json.invoke({
-            "file_path": str(file_path)
-        })
-        assert "Loaded 2 questions" in load_result
-        assert "Q1" in load_result
-        assert "Q2" in load_result
-    
-    def test_workflow_validate_and_save(self, tmp_path):
-        """Test workflow: validate then save."""
-        from src.tools import validate_questions_tool, save_questions_json
-        
+    def test_workflow_validate_questions(self, tmp_path):
+        """Test workflow: validate questions."""
+        from src.tools import validate_questions_tool
+
         questions = {
             "multiple_choice": [
                 {"title": "What is the capital of France?", 
@@ -863,14 +552,6 @@ class TestToolsIntegration:
             "question_type": "multiple_choice"
         })
         assert "VALID" in validate_result
-        
-        # Save
-        file_path = tmp_path / "validated.json"
-        save_result = save_questions_json.invoke({
-            "questions_json": json.dumps(questions),
-            "output_path": str(file_path)
-        })
-        assert "Saved" in save_result
 
 
 # ==================== Image Analysis Tests ====================
@@ -1035,10 +716,12 @@ class TestImageAnalysisPydanticModels:
 class TestAnalyzeImageTool:
     """Tests for the analyze_image tool."""
     
-    def test_no_image_paths(self):
+    def test_no_image_paths(self, tmp_path):
         """Test error when no image paths provided."""
+        output_path = tmp_path / "output.json"
         result = analyze_image.invoke({
             "image_paths": "",
+            "output_path": str(output_path),
             "question_type": "multiple_choice"
         })
         assert "Error" in result
@@ -1048,9 +731,11 @@ class TestAnalyzeImageTool:
         """Test error for invalid question type."""
         image_path = tmp_path / "test.png"
         image_path.write_bytes(b"fake image")
+        output_path = tmp_path / "output.json"
         
         result = analyze_image.invoke({
             "image_paths": str(image_path),
+            "output_path": str(output_path),
             "question_type": "invalid_type"
         })
         assert "Error" in result
@@ -1058,8 +743,10 @@ class TestAnalyzeImageTool:
     
     def test_nonexistent_image_path(self, tmp_path):
         """Test error for non-existent image."""
+        output_path = tmp_path / "output.json"
         result = analyze_image.invoke({
             "image_paths": str(tmp_path / "nonexistent.png"),
+            "output_path": str(output_path),
             "question_type": "multiple_choice"
         })
         assert "Error" in result
@@ -1070,11 +757,13 @@ class TestAnalyzeImageTool:
         # We just verify the validation passes, not the actual API call
         image_path = tmp_path / "test.png"
         image_path.write_bytes(b"fake image")
+        output_path = tmp_path / "output.json"
         
         # These should not fail with "Invalid question_type"
         for qtype in ["multiple_choice", "true_false", "mixed"]:
             result = analyze_image.invoke({
                 "image_paths": str(image_path),
+                "output_path": str(output_path),
                 "question_type": qtype
             })
             assert "Invalid question_type" not in result
@@ -1239,14 +928,17 @@ class TestAnalyzeImageToolWithMocking:
         # Create test image
         image_path = tmp_path / "test.png"
         image_path.write_bytes(b"fake image data")
+        output_path = tmp_path / "output.json"
         
         result = analyze_image.invoke({
             "image_paths": str(image_path),
+            "output_path": str(output_path),
             "question_type": "multiple_choice"
         })
         
         assert "Successfully extracted 1 multiple choice question" in result
-        assert "Q1" in result
+        assert "Saved" in result
+        assert output_path.exists()
     
     @patch("src.tools.image_analysis.create_agent")
     @patch("src.tools.image_analysis.ChatOpenAI")
@@ -1276,15 +968,17 @@ class TestAnalyzeImageToolWithMocking:
         
         image_path = tmp_path / "test.png"
         image_path.write_bytes(b"fake image data")
+        output_path = tmp_path / "output.json"
         
         result = analyze_image.invoke({
             "image_paths": str(image_path),
+            "output_path": str(output_path),
             "question_type": "true_false"
         })
         
         assert "Successfully extracted 2 true false question" in result
-        assert "Statement 1" in result
-        assert "Statement 2" in result
+        assert "Saved" in result
+        assert output_path.exists()
     
     @patch("src.tools.image_analysis.create_agent")
     @patch("src.tools.image_analysis.ChatOpenAI")
@@ -1317,18 +1011,17 @@ class TestAnalyzeImageToolWithMocking:
         
         image_path = tmp_path / "test.png"
         image_path.write_bytes(b"fake image data")
+        output_path = tmp_path / "output.json"
         
         result = analyze_image.invoke({
             "image_paths": str(image_path),
+            "output_path": str(output_path),
             "question_type": "mixed"
         })
         
         assert "Successfully extracted 3 question(s): 1 multiple choice, 2 true/false" in result
-        assert "MC Question" in result
-        assert "TF Statement 1" in result
-        assert "TF Statement 2" in result
-        assert "multiple_choice" in result
-        assert "true_false" in result
+        assert "Saved" in result
+        assert output_path.exists()
     
     @patch("src.tools.image_analysis.create_agent")
     @patch("src.tools.image_analysis.ChatOpenAI")
@@ -1358,9 +1051,11 @@ class TestAnalyzeImageToolWithMocking:
         
         image_path = tmp_path / "test.png"
         image_path.write_bytes(b"fake image data")
+        output_path = tmp_path / "output.json"
         
         result = analyze_image.invoke({
             "image_paths": str(image_path),
+            "output_path": str(output_path),
             "question_type": "mixed"
         })
         
@@ -1397,9 +1092,11 @@ class TestAnalyzeImageToolWithMocking:
         image2 = tmp_path / "test2.jpg"
         image1.write_bytes(b"fake image 1")
         image2.write_bytes(b"fake image 2")
+        output_path = tmp_path / "output.json"
         
         result = analyze_image.invoke({
             "image_paths": f"{image1},{image2}",
+            "output_path": str(output_path),
             "question_type": "multiple_choice"
         })
         
@@ -1427,9 +1124,11 @@ class TestAnalyzeImageToolWithMocking:
         
         image_path = tmp_path / "test.png"
         image_path.write_bytes(b"fake image data")
+        output_path = tmp_path / "output.json"
         
         result = analyze_image.invoke({
             "image_paths": str(image_path),
+            "output_path": str(output_path),
             "question_type": "multiple_choice"
         })
         

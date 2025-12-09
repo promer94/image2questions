@@ -3,12 +3,13 @@ Image Analysis Tool for LangChain Agent.
 
 This tool extracts questions from images using vision models.
 Supports both multiple-choice and true/false question types.
+Automatically saves extracted questions to JSON file.
 """
 
 import base64
+import json
 import os
 from pathlib import Path
-from typing import Literal
 
 from langchain.agents import create_agent
 from langchain.agents.structured_output import ProviderStrategy
@@ -16,8 +17,8 @@ from langchain.tools import tool
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
+from .json_generator import load_existing_questions
 from ..models.config import get_settings
-from ..models.questions import QuestionType
 
 
 # ==================== Pydantic Models for LLM Response ====================
@@ -127,6 +128,68 @@ def validate_image_paths(image_paths: list[str]) -> tuple[list[str], list[str]]:
             valid_paths.append(path)
     
     return valid_paths, errors
+
+
+def save_questions_to_json(
+    questions: dict,
+    output_path: Path,
+    append: bool = False,
+    pretty: bool = True
+) -> tuple[bool, str]:
+    """Save questions to a JSON file.
+    
+    Args:
+        questions: Question dictionary
+        output_path: Path to save the JSON file
+        append: If True, append to existing file
+        pretty: Whether to format with indentation
+        
+    Returns:
+        Tuple of (success, message)
+    """
+    try:
+        # Ensure directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Handle append mode
+        if append and output_path.exists():
+            existing, error = load_existing_questions(output_path)
+            if error:
+                return False, f"Error loading existing file: {error}"
+            
+            # Merge existing and new questions
+            questions = {
+                "multiple_choice": existing.get("multiple_choice", []) + questions.get("multiple_choice", []),
+                "true_false": existing.get("true_false", []) + questions.get("true_false", [])
+            }
+            
+            # Merge processed images
+            existing_images = existing.get("processed_images", [])
+            new_images = questions.get("processed_images", [])
+            if existing_images or new_images:
+                all_images = existing_images + [img for img in new_images if img not in existing_images]
+                questions["processed_images"] = all_images
+            
+            # Preserve type if present
+            if "type" in existing:
+                questions["type"] = existing["type"]
+        
+        # Format JSON
+        if pretty:
+            content = json.dumps(questions, ensure_ascii=False, indent=2)
+        else:
+            content = json.dumps(questions, ensure_ascii=False)
+        
+        # Write file
+        output_path.write_text(content, encoding="utf-8")
+        
+        # Count questions for message
+        count = len(questions.get("multiple_choice", [])) + len(questions.get("true_false", []))
+        
+        return True, f"Saved {count} questions to {output_path}"
+        
+    except Exception as e:
+        return False, f"Error saving file: {str(e)}"
 
 
 def build_image_content(image_paths: list[str]) -> list[dict]:
@@ -254,30 +317,34 @@ def extract_mixed(llm: ChatOpenAI, image_paths: list[str]) -> dict:
 @tool
 def analyze_image(
     image_paths: str,
-    question_type: str = "multiple_choice"
+    output_path: str,
+    question_type: str = "multiple_choice",
+    append: bool = False
 ) -> str:
-    """Extract questions from images using vision AI.
+    """Extract questions from images using vision AI and save to JSON file.
     
-    This tool analyzes images containing exam questions and extracts them
-    into structured data. It supports both multiple-choice questions
-    (with options A-D) and true/false questions.
+    This tool analyzes images containing exam questions, extracts them
+    into structured data, and saves directly to a JSON file. It supports 
+    both multiple-choice questions (with options A-D) and true/false questions.
     
     Args:
         image_paths: Comma-separated list of image file paths to analyze.
                     Example: "path/to/image1.png,path/to/image2.jpg"
+        output_path: File path where the JSON will be saved.
+                    Will create parent directories if needed.
         question_type: Type of questions to extract. Must be one of:
                       - "multiple_choice": Questions with options A, B, C, D
                       - "true_false": Statement questions for true/false judgment
                       - "mixed": Both multiple choice and true/false questions
+        append: If True, append questions to existing file.
+               If False, overwrite existing file. Default: False
     
     Returns:
         A string containing the extraction result with:
         - Number of questions found
-        - The extracted questions in JSON format
+        - The file path where questions were saved
         - Any errors encountered
     """
-    import json
-    
     # Parse image paths
     paths = [p.strip() for p in image_paths.split(",") if p.strip()]
     
@@ -293,6 +360,11 @@ def analyze_image(
     # Validate question type
     if question_type not in ("multiple_choice", "true_false", "mixed"):
         return f"Error: Invalid question_type '{question_type}'. Must be 'multiple_choice', 'true_false', or 'mixed'."
+    
+    # Prepare output path
+    file_path = Path(output_path)
+    if file_path.suffix.lower() != ".json":
+        file_path = file_path.with_suffix(".json")
     
     try:
         # Get settings
@@ -321,22 +393,31 @@ def analyze_image(
             tf_count = len(result_data["true_false"])
             total_count = mc_count + tf_count
         
+        # Add processed images to result data
+        result_data["processed_images"] = valid_paths
+        
+        # Save to JSON file
+        success, save_message = save_questions_to_json(result_data, file_path, append=append)
+        
+        if not success:
+            return f"Extraction succeeded but failed to save: {save_message}"
+        
         # Build result message
         if question_type == "mixed":
             result_lines = [
                 f"Successfully extracted {total_count} question(s): {mc_count} multiple choice, {tf_count} true/false.",
                 f"Source images: {len(valid_paths)}",
+                save_message,
             ]
         else:
             result_lines = [
                 f"Successfully extracted {total_count} {question_type.replace('_', ' ')} question(s).",
                 f"Source images: {len(valid_paths)}",
+                save_message,
             ]
         
         if errors:
             result_lines.append(f"Warnings: {len(errors)} image(s) could not be processed")
-        
-        result_lines.append(f"\nExtracted questions:\n{json.dumps(result_data, ensure_ascii=False, indent=2)}")
         
         return "\n".join(result_lines)
         

@@ -8,10 +8,8 @@ All tools are implemented using the LangChain @tool decorator and can be
 directly used with LangChain agents.
 
 Tools:
-    - analyze_image: Extract questions from images using vision AI
-    - save_questions_json: Save questions to JSON file
+    - analyze_image: Extract questions from images and save to JSON file
     - load_questions_json: Load questions from JSON file
-    - save_questions_word: Save questions to Word document
     - validate_questions_tool: Validate question quality
     - batch_process_images: Process multiple images from a directory
 
@@ -24,7 +22,6 @@ Example:
 """
 
 from .image_analysis import analyze_image
-from .json_generator import save_questions_json
 from .validation import validate_questions_tool
 from .batch_processor import batch_process_images
 
@@ -57,7 +54,6 @@ def get_all_tools() -> list:
     """
     return [
         analyze_image,
-        save_questions_json,
         validate_questions_tool,
         batch_process_images,
     ]
@@ -79,10 +75,9 @@ def get_output_tools() -> list:
     """Get only file output tools.
     
     Returns:
-        List of tools for saving questions to files.
+        List of tools for loading questions from files.
     """
     return [
-        save_questions_json,
     ]
 
 
@@ -100,7 +95,6 @@ def get_validation_tools() -> list:
 __all__ = [
     # Main tools
     "analyze_image",
-    "save_questions_json",
     "validate_questions_tool",
     "batch_process_images",
     # Tool getters
