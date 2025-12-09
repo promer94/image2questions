@@ -51,7 +51,6 @@ def find_images_in_directory(
 
 
 # ==================== LangChain Tool ====================
-
 @tool
 def batch_process_images(
     directory_path: str,
@@ -123,8 +122,6 @@ def batch_process_images(
             for p_str in questions.get("processed_images", []):
                 p = Path(p_str)
                 processed_images_set.add(str(p.resolve()))
-                # Also add the raw string just in case
-                processed_images_set.add(p_str)
         else:
             existing_info = f"Error reading file: {error}"
 
@@ -140,7 +137,7 @@ def batch_process_images(
         
     for abs_p, display_p in found_images_map.items():
         # Check if absolute path or display path is in processed set
-        if abs_p in processed_images_set or display_p in processed_images_set:
+        if abs_p in processed_images_set:
             processed_count += 1
         else:
             pending_images.append(display_p)

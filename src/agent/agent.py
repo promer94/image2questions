@@ -114,7 +114,7 @@ class QuestionExtractionAgent:
         #   - Remove analyze_image messages after save_questions_json
         #   - Remove save_questions_json messages after batch_process_images
         middleware = [
-           BatchProcessingContextMiddleware(keep_recent=1)  # Custom middleware for targeted cleanup
+           ### BatchProcessingContextMiddleware(keep_recent=1)  # Custom middleware for targeted cleanup
         ]
         
         # Create the agent using LangChain's create_agent
