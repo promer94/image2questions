@@ -35,6 +35,67 @@ console = Console()
 # Display Helpers
 # ============================================================================
 
+class TokenTracker:
+    """Track token usage across multiple agent calls."""
+    
+    def __init__(self):
+        self.total_tokens = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+        self.seen_message_ids = set()
+
+    def process_messages(self, messages: list) -> dict:
+        """
+        Process a list of messages and calculate token usage for new ones.
+        
+        Args:
+            messages: List of messages to process
+            
+        Returns:
+            dict: Token usage for the new messages found in this batch
+        """
+        call_usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+        
+        for msg in messages:
+            # Use message ID if available, otherwise skip to avoid double counting
+            # or use object ID for transient messages in streaming
+            msg_id = getattr(msg, "id", None)
+            
+            if msg_id and msg_id not in self.seen_message_ids:
+                self.seen_message_ids.add(msg_id)
+                
+                if hasattr(msg, "usage_metadata") and msg.usage_metadata:
+                    meta = msg.usage_metadata
+                    call_usage["input_tokens"] += meta.get("input_tokens", 0)
+                    call_usage["output_tokens"] += meta.get("output_tokens", 0)
+                    call_usage["total_tokens"] += meta.get("total_tokens", 0)
+        
+        # Update total
+        self.total_tokens["input_tokens"] += call_usage["input_tokens"]
+        self.total_tokens["output_tokens"] += call_usage["output_tokens"]
+        self.total_tokens["total_tokens"] += call_usage["total_tokens"]
+        
+        return call_usage
+
+
+def display_token_usage(usage: dict, total_usage: dict = None):
+    """Display token usage statistics."""
+    if not usage or usage.get("total_tokens", 0) == 0:
+        return
+        
+    input_tokens = usage.get("input_tokens", 0)
+    output_tokens = usage.get("output_tokens", 0)
+    total_tokens = usage.get("total_tokens", 0)
+    
+    usage_text = f"Token Usage: Input {input_tokens} + Output {output_tokens} = {total_tokens}"
+    
+    if total_usage:
+        total_input = total_usage.get("input_tokens", 0)
+        total_output = total_usage.get("output_tokens", 0)
+        total_all = total_usage.get("total_tokens", 0)
+        usage_text += f"\nTotal Session: Input {total_input} + Output {total_output} = {total_all}"
+        
+    console.print(Panel(usage_text, title="Token Usage", border_style="dim", expand=False))
+
+
 def display_welcome():
     """Display welcome message and help info."""
     welcome_text = """
@@ -289,7 +350,7 @@ def display_thinking():
 # Streaming Chat Handler
 # ============================================================================
 
-def stream_chat(agent, message: str, thread_id: str, verbose: bool = True):
+def stream_chat(agent, message: str, thread_id: str, verbose: bool = True, token_tracker: TokenTracker = None):
     """
     Stream agent response with tool call visualization.
     
@@ -303,12 +364,16 @@ def stream_chat(agent, message: str, thread_id: str, verbose: bool = True):
         message: User message to send
         thread_id: Conversation thread ID
         verbose: Whether to show detailed tool info
+        token_tracker: Optional TokenTracker to track usage
     """
     display_user_message(message)
     
     final_response = ""
     seen_tool_calls = set()
     seen_tool_results = set()
+    
+    # Track messages seen in this stream to calculate usage
+    stream_messages = []
     
     try:
         console.print()
@@ -321,6 +386,7 @@ def stream_chat(agent, message: str, thread_id: str, verbose: bool = True):
             for node_name, node_output in chunk.items():
                 # Get messages from this node's output
                 messages = node_output.get("messages", [])
+                stream_messages.extend(messages)
                 
                 for msg in messages:
                     msg_id = id(msg)
@@ -362,9 +428,10 @@ def stream_chat(agent, message: str, thread_id: str, verbose: bool = True):
                         if not (hasattr(msg, "tool_calls") and msg.tool_calls):
                             final_response = _get_message_content(msg)
         
-        # Display final response
-        if final_response:
-            display_agent_response(final_response)
+        if token_tracker:
+                call_usage = token_tracker.process_messages(stream_messages)
+                display_token_usage(call_usage, token_tracker.total_tokens)
+            
         
     except Exception as e:
         console.print(f"[red]Error during streaming: {e}[/red]")
@@ -373,10 +440,10 @@ def stream_chat(agent, message: str, thread_id: str, verbose: bool = True):
             console.print(f"[dim]{traceback.format_exc()}[/dim]")
         # Fall back to non-streaming
         console.print("[dim]Falling back to non-streaming mode...[/dim]")
-        invoke_chat(agent, message, thread_id, verbose)
+        invoke_chat(agent, message, thread_id, verbose, token_tracker)
 
 
-def invoke_chat(agent, message: str, thread_id: str, verbose: bool = True):
+def invoke_chat(agent, message: str, thread_id: str, verbose: bool = True, token_tracker: TokenTracker = None):
     """
     Invoke agent (non-streaming) with detailed output.
     
@@ -385,6 +452,7 @@ def invoke_chat(agent, message: str, thread_id: str, verbose: bool = True):
         message: User message to send
         thread_id: Conversation thread ID
         verbose: Whether to show detailed tool info
+        token_tracker: Optional TokenTracker to track usage
     """
     display_user_message(message)
     
@@ -440,6 +508,11 @@ def invoke_chat(agent, message: str, thread_id: str, verbose: bool = True):
         # Display the final response
         if final_response:
             display_agent_response(final_response)
+            
+            # Calculate and display token usage
+            if token_tracker:
+                call_usage = token_tracker.process_messages(messages)
+                display_token_usage(call_usage, token_tracker.total_tokens)
         
     except Exception as e:
         console.print(f"[red]Error during chat: {e}[/red]")
@@ -541,7 +614,8 @@ def extract(images, question_type, json_output, word_output, append, verbose):
     # Create agent and process
     try:
         agent = create_question_extraction_agent()
-        invoke_chat(agent, request, agent.thread_id, verbose)
+        token_tracker = TokenTracker()
+        invoke_chat(agent, request, agent.thread_id, verbose, token_tracker)
             
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -620,7 +694,8 @@ def batch(directory, question_type, json_output, word_output, recursive, verbose
     # Create agent and process
     try:
         agent = create_question_extraction_agent()
-        invoke_chat(agent, request, agent.thread_id, verbose)
+        token_tracker = TokenTracker()
+        invoke_chat(agent, request, agent.thread_id, verbose, token_tracker)
             
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -672,6 +747,7 @@ def interactive(language, no_stream, verbose):
     try:
         agent = create_question_extraction_agent(language=language)
         thread_id = agent.thread_id
+        token_tracker = TokenTracker()
         
         console.print(f"\n[dim]Session started. Thread ID: {thread_id[:8]}...[/dim]")
         console.print(f"[dim]Language: {'Chinese' if language == 'zh' else 'English'} | Verbose: {verbose}[/dim]\n")
@@ -742,14 +818,14 @@ def interactive(language, no_stream, verbose):
             
             # Regular chat message
             if no_stream:
-                invoke_chat(agent, user_input, thread_id, verbose)
+                invoke_chat(agent, user_input, thread_id, verbose, token_tracker)
             else:
                 # Try streaming first, fall back to invoke
                 try:
-                    stream_chat(agent, user_input, thread_id, verbose)
+                    stream_chat(agent, user_input, thread_id, verbose, token_tracker)
                 except NotImplementedError:
                     console.print(f"[dim]Streaming not available, using invoke mode...[/dim]")
-                    invoke_chat(agent, user_input, thread_id, verbose)
+                    invoke_chat(agent, user_input, thread_id, verbose, token_tracker)
         
         except KeyboardInterrupt:
             console.print("\n[yellow]Use /exit to quit[/yellow]")
