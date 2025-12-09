@@ -189,6 +189,5 @@ class BatchProcessingContextMiddleware(AgentMiddleware):
 
 # Export for convenient access
 __all__ = [
-    "ContextCleanupMiddleware",
     "BatchProcessingContextMiddleware",
 ]
