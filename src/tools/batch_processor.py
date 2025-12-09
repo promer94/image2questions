@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import Literal
 
 from langchain.tools import tool
-from .json_generator import load_existing_questions
+
+from src.utils.question_json_utils import load_existing_questions
 from .base import BatchProcessingResult
 
 

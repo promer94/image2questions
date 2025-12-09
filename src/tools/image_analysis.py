@@ -17,7 +17,8 @@ from langchain.tools import tool
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
-from .json_generator import load_existing_questions
+from src.utils.question_json_utils import load_existing_questions
+
 from ..models.config import get_settings
 
 

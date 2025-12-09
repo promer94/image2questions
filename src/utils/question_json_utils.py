@@ -1,10 +1,3 @@
-"""
-JSON Generator Tool for LangChain Agent.
-
-This tool loads questions from JSON files.
-The save functionality has been merged into analyze_image tool.
-"""
-
 import json
 from pathlib import Path
 
@@ -32,9 +25,3 @@ def load_existing_questions(file_path: Path) -> tuple[dict, str | None]:
         return {}, f"Existing file has invalid JSON: {str(e)}"
     except Exception as e:
         return {}, f"Error reading file: {str(e)}"
-
-
-# Export for convenient access
-__all__ = [
-    "load_existing_questions",
-]

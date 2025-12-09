@@ -17,6 +17,10 @@ from .file_utils import (
     is_valid_path,
 )
 
+from .question_json_utils import (
+    load_existing_questions
+)
+
 __all__ = [
     # Image utilities
     "encode_image_to_base64",
@@ -30,4 +34,5 @@ __all__ = [
     "write_json_file",
     "get_unique_filename",
     "is_valid_path",
+    "load_existing_questions"
 ]

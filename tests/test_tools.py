@@ -14,14 +14,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.tools.image_analysis import (
-    load_existing_questions,
     save_questions_to_json,
 )
 from src.tools.validation import (
     validate_title,
     validate_multiple_choice_options,
-    validate_multiple_choice_question,
-    validate_true_false_question,
     validate_questions,
     calculate_confidence_score,
     validate_questions_tool,
@@ -46,6 +43,7 @@ from src.tools.image_analysis import (
     TrueFalseResponse,
     MixedResponse,
 )
+from src.utils.question_json_utils import load_existing_questions
 
 
 # ==================== JSON Generator Tests ====================
