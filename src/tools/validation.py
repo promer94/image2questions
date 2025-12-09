@@ -6,6 +6,7 @@ based on completeness and quality checks.
 """
 
 import json
+from pathlib import Path
 from typing import Any
 
 from langchain.tools import tool
@@ -290,7 +291,7 @@ def validate_mixed_questions(data: dict) -> dict:
 
 @tool
 def validate_questions_tool(
-    questions_json: str,
+    questions_file: str,
     question_type: str = "multiple_choice"
 ) -> str:
     """Validate extracted questions for completeness and quality.
@@ -300,7 +301,7 @@ def validate_questions_tool(
     It provides a confidence score and detailed issue reports.
     
     Args:
-        questions_json: JSON string containing questions in one of these formats:
+        questions_file: Path to a JSON file containing questions in one of these formats:
                        - For multiple choice: [{"title": "...", "options": {"a": "...", "b": "...", "c": "...", "d": "..."}}]
                        - For true/false: [{"title": "..."}]
                        - For mixed: {"multiple_choice": [...], "true_false": [...]}
@@ -316,11 +317,18 @@ def validate_questions_tool(
         - Count of errors, warnings, and info messages
         - Detailed list of issues found
     """
-    # Parse input questions
+    # Read and parse input questions from file
+    file_path = Path(questions_file)
+    if not file_path.exists():
+        return f"Error: File not found: {questions_file}"
+    
     try:
-        data = json.loads(questions_json)
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
     except json.JSONDecodeError as e:
-        return f"Error: Invalid JSON: {str(e)}"
+        return f"Error: Invalid JSON in file: {str(e)}"
+    except Exception as e:
+        return f"Error: Failed to read file: {str(e)}"
     
     # Validate question type
     if question_type not in ("multiple_choice", "true_false", "mixed"):

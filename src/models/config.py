@@ -60,7 +60,7 @@ class Settings(BaseSettings):
         description="API key for agent LLM (defaults to DOUBAO_API_KEY if not set)"
     )
     agent_model: str = Field(
-        default="doubao-seed-1-6-251015",
+        default="doubao-seed-1-6-lite-251015",
         description="Model for agent reasoning"
     )
     agent_base_url: Optional[str] = Field(

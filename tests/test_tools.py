@@ -247,8 +247,8 @@ class TestCalculateConfidenceScore:
 class TestValidateQuestionsTool:
     """Tests for the validate_questions_tool tool."""
     
-    def test_validate_valid_questions(self):
-        """Test validating valid questions."""
+    def test_validate_valid_questions(self, tmp_path):
+        """Test validating valid questions from file."""
         questions = [
             {
                 "title": "What is the capital of France?",
@@ -256,33 +256,55 @@ class TestValidateQuestionsTool:
             }
         ]
         
+        # Write questions to file
+        questions_file = tmp_path / "questions.json"
+        questions_file.write_text(json.dumps(questions), encoding="utf-8")
+        
         result = validate_questions_tool.invoke({
-            "questions_json": json.dumps(questions),
+            "questions_file": str(questions_file),
             "question_type": "multiple_choice"
         })
         
         assert "VALID" in result
         assert "Confidence Score" in result
     
-    def test_validate_invalid_questions(self):
-        """Test validating invalid questions."""
+    def test_validate_invalid_questions(self, tmp_path):
+        """Test validating invalid questions from file."""
         questions = [{"title": "", "options": {"a": "", "b": "", "c": "", "d": ""}}]
         
+        # Write questions to file
+        questions_file = tmp_path / "questions.json"
+        questions_file.write_text(json.dumps(questions), encoding="utf-8")
+        
         result = validate_questions_tool.invoke({
-            "questions_json": json.dumps(questions),
+            "questions_file": str(questions_file),
             "question_type": "multiple_choice"
         })
         
         assert "INVALID" in result
     
-    def test_error_invalid_json(self):
-        """Test error handling for invalid JSON."""
+    def test_error_invalid_json(self, tmp_path):
+        """Test error handling for invalid JSON file."""
+        # Write invalid JSON to file
+        questions_file = tmp_path / "invalid.json"
+        questions_file.write_text("not json", encoding="utf-8")
+        
         result = validate_questions_tool.invoke({
-            "questions_json": "not json",
+            "questions_file": str(questions_file),
             "question_type": "multiple_choice"
         })
         
         assert "Error" in result
+    
+    def test_error_file_not_found(self):
+        """Test error handling when file does not exist."""
+        result = validate_questions_tool.invoke({
+            "questions_file": "/nonexistent/path/questions.json",
+            "question_type": "multiple_choice"
+        })
+        
+        assert "Error" in result
+        assert "not found" in result.lower()
 
 
 # ==================== Batch Processor Tests ====================
@@ -544,9 +566,13 @@ class TestToolsIntegration:
             "true_false": []
         }
         
+        # Write questions to file
+        questions_file = tmp_path / "questions.json"
+        questions_file.write_text(json.dumps(questions), encoding="utf-8")
+        
         # Validate
         validate_result = validate_questions_tool.invoke({
-            "questions_json": json.dumps(questions),
+            "questions_file": str(questions_file),
             "question_type": "multiple_choice"
         })
         assert "VALID" in validate_result
