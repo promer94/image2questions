@@ -15,7 +15,7 @@ from typing import Literal
 from langchain.tools import tool
 
 from src.utils.question_json_utils import load_existing_questions
-from .base import BatchProcessingResult
+from .base import BatchProcessArgs, BatchProcessingResult
 
 
 # ==================== Supported Extensions ====================
@@ -52,7 +52,9 @@ def find_images_in_directory(
 
 
 # ==================== LangChain Tool ====================
-@tool
+@tool(
+  args_schema=BatchProcessArgs,
+)
 def batch_process_images(
     directory_path: str,
     recursive: bool = False,

@@ -27,6 +27,14 @@ class ToolResult(BaseModel):
         return result
 
 
+class BatchProcessArgs(BaseModel):
+    """Arguments for batch processing tool."""
+    directory_path: str = Field(description="Path to the directory containing images")
+    recursive: bool = Field(default=False, description="Whether to search subdirectories recursively")
+    output_path: str | None = Field(default=None, description="Path to save the output JSON files")
+    batch_size: int = Field(default=2, description="Number of images to process in each batch")
+
+
 class ImageAnalysisResult(BaseModel):
     """Result from image analysis tool."""
     success: bool = Field(description="Whether analysis was successful")
