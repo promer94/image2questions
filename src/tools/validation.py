@@ -418,14 +418,28 @@ def validate_questions_tool(
                 lines.append("  Multiple Choice:")
                 for issue in report["multiple_choice_issues"]:
                     severity_icon = {"error": "✗", "warning": "⚠", "info": "ℹ"}.get(issue["severity"], "•")
-                    lines.append(f"    {severity_icon} Q{issue['question_index']+1}: {issue['message']} [{issue['issue_type']}]")
+                    q_index = issue["question_index"]
+                    qid = None
+                    if isinstance(original_data, dict):
+                        mc_list = original_data.get("multiple_choice", []) or []
+                        if 0 <= q_index < len(mc_list):
+                            qid = mc_list[q_index].get("id")
+                    label = qid or f"Q{q_index+1}"
+                    lines.append(f"    {severity_icon} {label}: {issue['message']} [{issue['issue_type']}]")
             
             # Show true/false issues
             if report["true_false_issues"]:
                 lines.append("  True/False:")
                 for issue in report["true_false_issues"]:
                     severity_icon = {"error": "✗", "warning": "⚠", "info": "ℹ"}.get(issue["severity"], "•")
-                    lines.append(f"    {severity_icon} Q{issue['question_index']+1}: {issue['message']} [{issue['issue_type']}]")
+                    q_index = issue["question_index"]
+                    qid = None
+                    if isinstance(original_data, dict):
+                        tf_list = original_data.get("true_false", []) or []
+                        if 0 <= q_index < len(tf_list):
+                            qid = tf_list[q_index].get("id")
+                    label = qid or f"Q{q_index+1}"
+                    lines.append(f"    {severity_icon} {label}: {issue['message']} [{issue['issue_type']}]")
         else:
             lines.append("")
             lines.append("No issues found. All questions passed validation.")
@@ -487,7 +501,12 @@ def validate_questions_tool(
         lines.append("Issue Details:")
         for issue in report["issues"]:
             severity_icon = {"error": "✗", "warning": "⚠", "info": "ℹ"}.get(issue["severity"], "•")
-            lines.append(f"  {severity_icon} Q{issue['question_index']+1}: {issue['message']} [{issue['issue_type']}]")
+            q_index = issue["question_index"]
+            qid = None
+            if 0 <= q_index < len(data):
+                qid = data[q_index].get("id")
+            label = qid or f"Q{q_index+1}"
+            lines.append(f"  {severity_icon} {label}: {issue['message']} [{issue['issue_type']}]")
     else:
         lines.append("")
         lines.append("No issues found. All questions passed validation.")

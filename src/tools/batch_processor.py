@@ -199,7 +199,7 @@ def batch_process_images(
         lines.append("1. Call `analyze_image` with the images listed in 'Next Batch to Process' above.")
         lines.append("2. Repeat for remaining images.")
     else:
-        lines.append("All images have been processed. You can review the output file.")
+        lines.append("All images have been processed. validate the results.")
     
     return "\n".join(lines)
 
