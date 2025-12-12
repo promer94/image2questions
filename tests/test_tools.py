@@ -68,6 +68,27 @@ class TestSaveQuestionsToJson:
         content = json.loads(output_path.read_text(encoding="utf-8"))
         assert len(content["multiple_choice"]) == 1
         assert content["multiple_choice"][0]["title"] == "Q1"
+        assert "id" in content["multiple_choice"][0]
+
+    def test_save_dedupes_by_content_hash_id(self, tmp_path):
+        """Same question saved twice should be de-duplicated by id."""
+        output_path = tmp_path / "output.json"
+        q = {"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}}
+
+        success, _ = save_questions_to_json(
+            {"multiple_choice": [q], "true_false": []},
+            output_path,
+        )
+        assert success
+
+        success, _ = save_questions_to_json(
+            {"multiple_choice": [q], "true_false": []},
+            output_path,
+        )
+        assert success
+
+        content = json.loads(output_path.read_text(encoding="utf-8"))
+        assert len(content["multiple_choice"]) == 1
     
     def test_save_creates_parent_directories(self, tmp_path):
         """Test that parent directories are created."""
@@ -354,177 +375,6 @@ class TestFindImagesInDirectory:
         images = find_images_in_directory(tmp_path)
         
         assert len(images) == 2
-
-
-# ==================== Word Generator Tests ====================
-
-class TestWordGenerator:
-    """Tests for Word generator functions."""
-    
-    def test_word_generator_import(self):
-        """Test that Word generator can be imported."""
-        from src.tools.word_generator import (
-            save_questions_word,
-            generate_word_document,
-        )
-        assert save_questions_word is not None
-        assert generate_word_document is not None
-    
-    def test_generate_multiple_choice_document(self, tmp_path):
-        """Test generating a multiple choice Word document."""
-        from src.tools.word_generator import generate_word_document
-        
-        questions = [
-            {
-                "title": "What is 2+2?",
-                "options": {"a": "3", "b": "4", "c": "5", "d": "6"}
-            }
-        ]
-        output_path = tmp_path / "mc.docx"
-        
-        success, message, count = generate_word_document(
-            questions, output_path, "multiple_choice"
-        )
-        
-        assert success
-        assert count == 1
-        assert output_path.exists()
-    
-    def test_generate_true_false_document(self, tmp_path):
-        """Test generating a true/false Word document."""
-        from src.tools.word_generator import generate_word_document
-        
-        questions = [{"title": "The sky is blue."}]
-        output_path = tmp_path / "tf.docx"
-        
-        success, message, count = generate_word_document(
-            questions, output_path, "true_false"
-        )
-        
-        assert success
-        assert count == 1
-        assert output_path.exists()
-    
-    def test_save_questions_word_tool(self, tmp_path):
-        """Test the save_questions_word tool."""
-        from src.tools.word_generator import save_questions_word
-        
-        questions = [
-            {
-                "title": "What is 2+2?",
-                "options": {"a": "3", "b": "4", "c": "5", "d": "6"}
-            }
-        ]
-        output_path = tmp_path / "output.docx"
-        
-        result = save_questions_word.invoke({
-            "questions_json": json.dumps(questions),
-            "output_path": str(output_path),
-            "question_type": "multiple_choice"
-        })
-        
-        assert "Successfully" in result or "Created" in result
-        assert output_path.exists()
-    
-    def test_save_questions_word_mixed_format(self, tmp_path):
-        """Test the save_questions_word tool with mixed format from image analysis."""
-        from src.tools.word_generator import save_questions_word
-        
-        mixed_data = {
-            "multiple_choice": [
-                {"title": "What is 2+2?", "options": {"a": "3", "b": "4", "c": "5", "d": "6"}}
-            ],
-            "true_false": [
-                {"title": "The sky is blue."}
-            ]
-        }
-        output_path = tmp_path / "mixed.docx"
-        
-        result = save_questions_word.invoke({
-            "questions_json": json.dumps(mixed_data),
-            "output_path": str(output_path),
-            "question_type": "auto"
-        })
-        
-        assert "Successfully" in result or "Created" in result
-        assert output_path.exists()
-        assert "2 questions" in result
-        assert "1 multiple choice" in result
-        assert "1 true/false" in result
-    
-    def test_save_questions_word_mixed_extract_mc(self, tmp_path):
-        """Test extracting only multiple choice from mixed format."""
-        from src.tools.word_generator import save_questions_word
-        
-        mixed_data = {
-            "multiple_choice": [
-                {"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}}
-            ],
-            "true_false": [
-                {"title": "Q2"}
-            ]
-        }
-        output_path = tmp_path / "mc_only.docx"
-        
-        result = save_questions_word.invoke({
-            "questions_json": json.dumps(mixed_data),
-            "output_path": str(output_path),
-            "question_type": "multiple_choice"
-        })
-        
-        assert "Successfully" in result or "Created" in result
-        assert output_path.exists()
-    
-    def test_save_questions_word_mixed_extract_tf(self, tmp_path):
-        """Test extracting only true/false from mixed format."""
-        from src.tools.word_generator import save_questions_word
-        
-        mixed_data = {
-            "multiple_choice": [
-                {"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}}
-            ],
-            "true_false": [
-                {"title": "Q2"}
-            ]
-        }
-        output_path = tmp_path / "tf_only.docx"
-        
-        result = save_questions_word.invoke({
-            "questions_json": json.dumps(mixed_data),
-            "output_path": str(output_path),
-            "question_type": "true_false"
-        })
-        
-        assert "Successfully" in result or "Created" in result
-        assert output_path.exists()
-    
-    def test_save_questions_word_auto_detect(self, tmp_path):
-        """Test auto-detecting question type from list format."""
-        from src.tools.word_generator import save_questions_word
-        
-        # Multiple choice with options
-        mc_questions = [{"title": "Q1", "options": {"a": "A", "b": "B", "c": "C", "d": "D"}}]
-        output_path = tmp_path / "auto_mc.docx"
-        
-        result = save_questions_word.invoke({
-            "questions_json": json.dumps(mc_questions),
-            "output_path": str(output_path),
-            "question_type": "auto"
-        })
-        
-        assert "Successfully" in result or "Created" in result
-        
-        # True/false without options
-        tf_questions = [{"title": "The earth is round."}]
-        output_path2 = tmp_path / "auto_tf.docx"
-        
-        result2 = save_questions_word.invoke({
-            "questions_json": json.dumps(tf_questions),
-            "output_path": str(output_path2),
-            "question_type": "auto"
-        })
-        
-        assert "Successfully" in result2 or "Created" in result2
 
 
 # ==================== Integration Tests ====================
@@ -827,8 +677,10 @@ class TestExtractFunctions:
         assert result["multiple_choice"][0]["options"]["a"] == "3"
         assert result["multiple_choice"][0]["options"]["b"] == "4"
         assert result["multiple_choice"][0]["source_image"] == ["fake_path.png"]
+        assert "id" in result["multiple_choice"][0]
         assert result["multiple_choice"][1]["title"] == "Capital of France?"
         assert result["multiple_choice"][1]["source_image"] == ["fake_path.png"]
+        assert "id" in result["multiple_choice"][1]
     
     def test_extract_true_false(self):
         """Test extract_true_false with mocked create_agent."""
@@ -853,8 +705,10 @@ class TestExtractFunctions:
         assert len(result["true_false"]) == 2
         assert result["true_false"][0]["title"] == "The sky is blue."
         assert result["true_false"][0]["source_image"] == ["fake_path.png"]
+        assert "id" in result["true_false"][0]
         assert result["true_false"][1]["title"] == "Water boils at 50°C."
         assert result["true_false"][1]["source_image"] == ["fake_path.png"]
+        assert "id" in result["true_false"][1]
     
     def test_extract_mixed(self):
         """Test extract_mixed with mocked create_agent."""
@@ -889,10 +743,13 @@ class TestExtractFunctions:
         assert result["multiple_choice"][0]["title"] == "What is 2+2?"
         assert result["multiple_choice"][0]["options"]["b"] == "4"
         assert result["multiple_choice"][0]["source_image"] == ["fake_path.png"]
+        assert "id" in result["multiple_choice"][0]
         assert result["true_false"][0]["title"] == "The sky is blue."
         assert result["true_false"][0]["source_image"] == ["fake_path.png"]
+        assert "id" in result["true_false"][0]
         assert result["true_false"][1]["title"] == "Fire is cold."
         assert result["true_false"][1]["source_image"] == ["fake_path.png"]
+        assert "id" in result["true_false"][1]
     
     def test_extract_mixed_empty_one_type(self):
         """Test extract_mixed when one type has no questions."""

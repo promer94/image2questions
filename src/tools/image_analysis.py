@@ -7,6 +7,7 @@ Automatically saves extracted questions to JSON file.
 """
 
 import base64
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -95,6 +96,63 @@ MIXED_PROMPT = """你是一个专业的题目识别助手。请仔细分析图�
 
 # ==================== Helper Functions ====================
 
+def normalize_question_text(value: str) -> str:
+    if value is None:
+        return ""
+    return " ".join(str(value).split())
+
+
+def question_hash_payload(question: dict, qtype: str) -> dict:
+    title = normalize_question_text(question.get("title", ""))
+    if qtype == "multiple_choice":
+        options = question.get("options") or {}
+        payload = {
+            "type": "multiple_choice",
+            "title": title,
+            "options": {
+                "a": normalize_question_text(options.get("a", "")),
+                "b": normalize_question_text(options.get("b", "")),
+                "c": normalize_question_text(options.get("c", "")),
+                "d": normalize_question_text(options.get("d", "")),
+            },
+        }
+    else:
+        payload = {"type": "true_false", "title": title}
+    return payload
+
+
+def ensure_question_id(question: dict, qtype: str) -> dict:
+    if question.get("id"):
+        return question
+    payload = question_hash_payload(question, qtype)
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    prefix = "mc" if qtype == "multiple_choice" else "tf"
+    question["id"] = f"{prefix}_{digest[:12]}"
+    return question
+
+
+def ensure_ids_for_list(items: list[dict], qtype: str) -> list[dict]:
+    return [ensure_question_id(dict(item), qtype) for item in items]
+
+
+def dedupe_by_id(items: list[dict]) -> list[dict]:
+    seen: set[str] = set()
+    deduped: list[dict] = []
+    for item in items:
+        qid = item.get("id")
+        if not qid:
+            payload = question_hash_payload(item, item.get("question_type", "") or "true_false")
+            canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            qid = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+            item["id"] = qid
+        if qid in seen:
+            continue
+        seen.add(qid)
+        deduped.append(item)
+    return deduped
+
+
 def encode_image_to_base64(image_path: str) -> str:
     """Encode image to base64 string."""
     with open(image_path, "rb") as image_file:
@@ -136,33 +194,38 @@ def save_questions_to_json(
     output_path: Path,
     pretty: bool = True
 ) -> tuple[bool, str]:
-    """Save questions to a JSON file.
+    """Save questions to a JSON file, generating stable ids and de-duplicating.
     
-    Args:
-        questions: Question dictionary
-        output_path: Path to save the JSON file
-        pretty: Whether to format with indentation
-        
-    Returns:
-        Tuple of (success, message)
+    Each question will receive an `id` derived from a hash of its normalized content.
+    When appending to an existing file, questions are merged and de-duplicated by id.
     """
+
     try:
         # Ensure directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Ensure ids for incoming questions
+        incoming_mc = ensure_ids_for_list(questions.get("multiple_choice", []) or [], "multiple_choice")
+        incoming_tf = ensure_ids_for_list(questions.get("true_false", []) or [], "true_false")
+        questions["multiple_choice"] = incoming_mc
+        questions["true_false"] = incoming_tf
         
         # Handle append mode
         if output_path.exists():
             existing, error = load_existing_questions(output_path)
             if error:
                 return False, f"Error loading existing file: {error}"
+
+            existing_mc = ensure_ids_for_list(existing.get("multiple_choice", []) or [], "multiple_choice")
+            existing_tf = ensure_ids_for_list(existing.get("true_false", []) or [], "true_false")
             
             # Merge processed images
             existing_images = existing.get("processed_images", [])
             new_images = questions.get("processed_images", [])
             # Merge existing and new questions
             questions = {
-                "multiple_choice": existing.get("multiple_choice", []) + questions.get("multiple_choice", []),
-                "true_false": existing.get("true_false", []) + questions.get("true_false", []),
+                "multiple_choice": dedupe_by_id(existing_mc + questions.get("multiple_choice", [])),
+                "true_false": dedupe_by_id(existing_tf + questions.get("true_false", [])),
             }
             if existing_images or new_images:
                 all_images = existing_images + [img for img in new_images if img not in existing_images]
@@ -225,9 +288,8 @@ def extract_multiple_choice(llm: ChatOpenAI, image_paths: list[str]) -> dict:
     
     result = response["structured_response"]
     
-    return {
-        "type": "multiple_choice",
-        "multiple_choice": [
+    multiple_choice_items = [
+        ensure_question_id(
             {
                 "title": q.title,
                 "options": {
@@ -237,9 +299,15 @@ def extract_multiple_choice(llm: ChatOpenAI, image_paths: list[str]) -> dict:
                     "d": q.options.d,
                 },
                 "source_image": image_paths,
-            }
-            for q in result.questions
-        ]
+            },
+            "multiple_choice",
+        )
+        for q in result.questions
+    ]
+
+    return {
+        "type": "multiple_choice",
+        "multiple_choice": multiple_choice_items
     }
 
 
@@ -262,9 +330,14 @@ def extract_true_false(llm: ChatOpenAI, image_paths: list[str]) -> dict:
     
     result = response["structured_response"]
     
+    true_false_items = [
+        ensure_question_id({"title": q.title, "source_image": image_paths}, "true_false")
+        for q in result.questions
+    ]
+
     return {
         "type": "true_false",
-        "true_false": [{"title": q.title, "source_image": image_paths} for q in result.questions]
+        "true_false": true_false_items
     }
 
 
@@ -288,20 +361,26 @@ def extract_mixed(llm: ChatOpenAI, image_paths: list[str]) -> dict:
     result = response["structured_response"]
     
     multiple_choice = [
-        {
-            "title": q.title,
-            "options": {
-                "a": q.options.a,
-                "b": q.options.b,
-                "c": q.options.c,
-                "d": q.options.d,
+        ensure_question_id(
+            {
+                "title": q.title,
+                "options": {
+                    "a": q.options.a,
+                    "b": q.options.b,
+                    "c": q.options.c,
+                    "d": q.options.d,
+                },
+                "source_image": image_paths,
             },
-            "source_image": image_paths,
-        }
+            "multiple_choice",
+        )
         for q in result.multiple_choice_questions
     ]
     
-    true_false = [{"title": q.title, "source_image": image_paths} for q in result.true_false_questions]
+    true_false = [
+        ensure_question_id({"title": q.title, "source_image": image_paths}, "true_false")
+        for q in result.true_false_questions
+    ]
     
     return {
         "type": "mixed",
