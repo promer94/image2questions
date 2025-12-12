@@ -238,6 +238,54 @@ def validate_questions(
     }
 
 
+def collect_failed_question_ids(
+    questions: list[dict],
+    issues: list[dict],
+) -> list[str]:
+    """Collect IDs of questions that failed validation.
+
+    A question is considered failed if it has at least one issue with
+    severity == "error". If a question has no id, a fallback like "Q1"
+    is used.
+    """
+    error_indices = {issue["question_index"] for issue in issues if issue["severity"] == "error"}
+    failed_ids: list[str] = []
+    for idx in sorted(error_indices):
+        if 0 <= idx < len(questions):
+            qid = questions[idx].get("id")
+            failed_ids.append(qid if qid else f"Q{idx+1}")
+    return failed_ids
+
+
+def collect_failed_question_ids_mixed(data: dict, issues: list[dict]) -> list[str]:
+    """Collect failed IDs for mixed question JSON."""
+    mc_questions = data.get("multiple_choice", []) or []
+    tf_questions = data.get("true_false", []) or []
+
+    mc_error_indices = {
+        issue["question_index"]
+        for issue in issues
+        if issue.get("severity") == "error" and issue.get("question_type") == "multiple_choice"
+    }
+    tf_error_indices = {
+        issue["question_index"]
+        for issue in issues
+        if issue.get("severity") == "error" and issue.get("question_type") == "true_false"
+    }
+
+    failed_ids: list[str] = []
+    for idx in sorted(mc_error_indices):
+        if 0 <= idx < len(mc_questions):
+            qid = mc_questions[idx].get("id")
+            failed_ids.append(qid if qid else f"MC_Q{idx+1}")
+    for idx in sorted(tf_error_indices):
+        if 0 <= idx < len(tf_questions):
+            qid = tf_questions[idx].get("id")
+            failed_ids.append(qid if qid else f"TF_Q{idx+1}")
+
+    return failed_ids
+
+
 def validate_mixed_questions(data: dict) -> dict:
     """Validate mixed questions (both multiple choice and true/false).
     
@@ -329,6 +377,8 @@ def validate_questions_tool(
         return f"Error: Invalid JSON in file: {str(e)}"
     except Exception as e:
         return f"Error: Failed to read file: {str(e)}"
+
+    original_data: Any = data
     
     # Validate question type
     if question_type not in ("multiple_choice", "true_false", "mixed"):
@@ -380,6 +430,24 @@ def validate_questions_tool(
             lines.append("")
             lines.append("No issues found. All questions passed validation.")
         
+        failed_ids = collect_failed_question_ids_mixed(original_data, report["issues"])
+        lines.append("")
+        if failed_ids:
+            lines.append(f"Failed Question IDs: {', '.join(failed_ids)}")
+        else:
+            lines.append("Failed Question IDs: (none)")
+
+        if isinstance(original_data, dict):
+            original_data["failed_question_ids"] = failed_ids
+            try:
+                file_path.write_text(
+                    json.dumps(original_data, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+            except Exception:
+                lines.append("")
+                lines.append("Warning: Failed to write failed_question_ids back to JSON.")
+
         return "\n".join(lines)
     
     # Handle single type (multiple_choice or true_false)
@@ -424,6 +492,27 @@ def validate_questions_tool(
         lines.append("")
         lines.append("No issues found. All questions passed validation.")
     
+    failed_ids = collect_failed_question_ids(data, report["issues"])
+    lines.append("")
+    if failed_ids:
+        lines.append(f"Failed Question IDs: {', '.join(failed_ids)}")
+    else:
+        lines.append("Failed Question IDs: (none)")
+
+    if isinstance(original_data, dict):
+        original_data["failed_question_ids"] = failed_ids
+        try:
+            file_path.write_text(
+                json.dumps(original_data, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception:
+            lines.append("")
+            lines.append("Warning: Failed to write failed_question_ids back to JSON.")
+    elif isinstance(original_data, list):
+        lines.append("")
+        lines.append("Note: Input JSON is an array; failed_question_ids not persisted to avoid changing schema.")
+
     return "\n".join(lines)
 
 
