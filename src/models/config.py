@@ -83,6 +83,16 @@ class Settings(BaseSettings):
         default=0.0,
         description="Temperature for agent LLM"
     )
+    
+    agent_provider: str = Field(
+        default="openai",
+        description="Provider for agent LLM (openai, anthropic)"
+    )
+
+    anthropic_api_key: Optional[str] = Field(
+        default=None,
+        description="API key for Anthropic"
+    )
 
     # -------------------------------------------------------------------------
     # Output Configuration

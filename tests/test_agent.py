@@ -161,6 +161,25 @@ class TestAgentInitialization:
         # Verify checkpointer was passed to create_agent
         create_call_kwargs = mock_create_agent.call_args[1]
         assert create_call_kwargs["checkpointer"] is not None
+    
+    @patch("src.agent.agent.ChatAnthropic")
+    @patch("src.agent.agent.ChatOpenAI")
+    @patch("src.agent.agent.create_agent")
+    def test_agent_init_with_anthropic(self, mock_create_agent, mock_chat_openai, mock_chat_anthropic):
+        """Test agent initialization with Anthropic provider."""
+        mock_create_agent.return_value = MagicMock()
+        
+        agent = QuestionExtractionAgent(provider="anthropic")
+        
+        # Verify ChatAnthropic was called
+        mock_chat_anthropic.assert_called_once()
+        
+        # Verify ChatOpenAI was NOT called
+        mock_chat_openai.assert_not_called()
+        
+        # Verify create_agent was called
+        mock_create_agent.assert_called_once()
+
 
 
 # =============================================================================

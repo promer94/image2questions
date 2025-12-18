@@ -12,8 +12,7 @@ import json
 import os
 from pathlib import Path
 
-from langchain.agents import create_agent
-from langchain.agents.structured_output import ProviderStrategy
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain.tools import tool
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
@@ -275,23 +274,18 @@ def build_image_content(image_paths: list[str]) -> list[dict]:
 
 
 def extract_multiple_choice(llm: ChatOpenAI, image_paths: list[str]) -> dict:
-    """Extract multiple choice questions from images using LangChain agent."""
+    """Extract multiple choice questions from images using direct LLM call."""
     content = [{"type": "text", "text": "请识别以下图片中的所有选择题。"}]
     content.extend(build_image_content(image_paths))
     
-    # Create agent with ProviderStrategy for native structured output
-    agent = create_agent(
-        model=llm,
-        system_prompt=MULTIPLE_CHOICE_PROMPT,
-        tools=[],
-        response_format=ProviderStrategy(MultipleChoiceResponse),
-    )
+    structured_llm = llm.with_structured_output(MultipleChoiceResponse)
     
-    response = agent.invoke({
-        "messages": [{"role": "user", "content": content}]
-    })
+    messages = [
+        SystemMessage(content=MULTIPLE_CHOICE_PROMPT),
+        HumanMessage(content=content)
+    ]
     
-    result = response["structured_response"]
+    result = structured_llm.invoke(messages)
     
     multiple_choice_items = [
         ensure_question_id(
@@ -317,23 +311,18 @@ def extract_multiple_choice(llm: ChatOpenAI, image_paths: list[str]) -> dict:
 
 
 def extract_true_false(llm: ChatOpenAI, image_paths: list[str]) -> dict:
-    """Extract true/false questions from images using LangChain agent."""
+    """Extract true/false questions from images using direct LLM call."""
     content = [{"type": "text", "text": "请识别以下图片中的所有判断题。"}]
     content.extend(build_image_content(image_paths))
     
-    # Create agent with ProviderStrategy for native structured output
-    agent = create_agent(
-        model=llm,
-        system_prompt=TRUE_FALSE_PROMPT,
-        tools=[],
-        response_format=ProviderStrategy(TrueFalseResponse),
-    )
+    structured_llm = llm.with_structured_output(TrueFalseResponse)
     
-    response = agent.invoke({
-        "messages": [{"role": "user", "content": content}]
-    })
+    messages = [
+        SystemMessage(content=TRUE_FALSE_PROMPT),
+        HumanMessage(content=content)
+    ]
     
-    result = response["structured_response"]
+    result = structured_llm.invoke(messages)
     
     true_false_items = [
         ensure_question_id({"title": q.title, "source_image": image_paths}, "true_false")
@@ -347,23 +336,18 @@ def extract_true_false(llm: ChatOpenAI, image_paths: list[str]) -> dict:
 
 
 def extract_mixed(llm: ChatOpenAI, image_paths: list[str]) -> dict:
-    """Extract both multiple choice and true/false questions from images using LangChain agent."""
-    content = [{"type": "input_text", "text": "请识别以下图片中的所有题目，包括选择题和判断题。"}]
+    """Extract both multiple choice and true/false questions from images using direct LLM call."""
+    content = [{"type": "text", "text": "请识别以下图片中的所有题目，包括选择题和判断题。"}]
     content.extend(build_image_content(image_paths))
     
-    # Create agent with ProviderStrategy for native structured output
-    agent = create_agent(
-        model=llm,
-        system_prompt=MIXED_PROMPT,
-        tools=[],
-        response_format=ProviderStrategy(MixedResponse),
-    )
+    structured_llm = llm.with_structured_output(MixedResponse)
     
-    response = agent.invoke({
-        "messages": [{"role": "user", "content": content}]
-    })
+    messages = [
+        SystemMessage(content=MIXED_PROMPT),
+        HumanMessage(content=content)
+    ]
     
-    result = response["structured_response"]
+    result = structured_llm.invoke(messages)
     
     multiple_choice = [
         ensure_question_id(

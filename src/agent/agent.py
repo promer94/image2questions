@@ -17,8 +17,10 @@ from typing import Optional, Union
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import ContextEditingMiddleware, ClearToolUsesEdit
+from langchain_anthropic.middleware import AnthropicPromptCachingMiddleware
 from langchain.agents.structured_output import ToolStrategy
 from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
 from langgraph.checkpoint.memory import InMemorySaver
 
 from ..models.config import get_settings
@@ -63,6 +65,7 @@ class QuestionExtractionAgent:
         language: str = "zh",
         use_structured_output: bool = True,
         checkpointer: Optional[object] = "default",
+        provider: Optional[str] = None,
     ):
         """
         Initialize the Question Extraction Agent.
@@ -76,19 +79,29 @@ class QuestionExtractionAgent:
             language: Language for default prompt ('zh' or 'en')
             use_structured_output: Whether to use structured output format (default True)
             checkpointer: Checkpointer for memory (defaults to InMemorySaver, set to None to disable)
+            provider: LLM provider ('openai', 'anthropic', etc.)
         """
         settings = get_settings()
+        self.provider = provider or settings.agent_provider
         
         # Configure LLM
-        self.model = ChatOpenAI(
-            model=model_name or settings.agent_model,
-            api_key=api_key or settings.effective_agent_api_key,
-            base_url=base_url or settings.agent_base_url,
-            temperature=temperature if temperature is not None else settings.agent_temperature,
-            ### workaroud https://github.com/langchain-ai/langchain/issues/34124#issuecomment-3586763122
-            use_responses_api=True,
-            use_previous_response_id=True
-        )
+        if self.provider == "anthropic":
+            self.model = ChatAnthropic(
+                model=model_name or settings.agent_model,
+                api_key=api_key or settings.anthropic_api_key,
+                anthropic_api_url=base_url or settings.agent_base_url,
+                temperature=temperature if temperature is not None else settings.agent_temperature,
+            )
+        else:
+            self.model = ChatOpenAI(
+                model=model_name or settings.agent_model,
+                api_key=api_key or settings.effective_agent_api_key,
+                base_url=base_url or settings.agent_base_url,
+                temperature=temperature if temperature is not None else settings.agent_temperature,
+                ### workaroud https://github.com/langchain-ai/langchain/issues/34124#issuecomment-3586763122
+                use_responses_api=True,
+                use_previous_response_id=True
+            )
         
         # Get tools
         self.tools = get_all_tools()
@@ -113,6 +126,7 @@ class QuestionExtractionAgent:
         #   - Remove analyze_image messages after save_questions_json
         #   - Remove save_questions_json messages after batch_process_images
         middleware = [
+           AnthropicPromptCachingMiddleware() if self.provider == "anthropic" else None,   
            ContextEditingMiddleware(
             edits=[
                 ClearToolUsesEdit(
@@ -320,6 +334,7 @@ def create_question_extraction_agent(
     system_prompt: Optional[str] = None,
     language: str = "zh",
     use_structured_output: bool = True,
+    provider: Optional[str] = None,
 ) -> QuestionExtractionAgent:
     """
     Factory function to create a Question Extraction Agent.
@@ -335,6 +350,7 @@ def create_question_extraction_agent(
         system_prompt: Custom system prompt
         language: Language for default prompt ('zh' or 'en')
         use_structured_output: Whether to use structured output format (default True)
+        provider: LLM provider ('openai', 'anthropic', etc.)
         
     Returns:
         Configured QuestionExtractionAgent instance
@@ -351,6 +367,7 @@ def create_question_extraction_agent(
         system_prompt=system_prompt,
         language=language,
         use_structured_output=use_structured_output,
+        provider=provider,
     )
 
 
@@ -360,6 +377,7 @@ def extract_questions(
     model_name: Optional[str] = None,
     api_key: Optional[str] = None,
     use_structured_output: bool = True,
+    provider: Optional[str] = None,
 ) -> Union[str, AgentResponse]:
     """
     Quick function for single-turn question extraction.
@@ -372,6 +390,7 @@ def extract_questions(
         model_name: Optional LLM model name
         api_key: Optional API key
         use_structured_output: Whether to return structured output (default True)
+        provider: LLM provider ('openai', 'anthropic', etc.)
         
     Returns:
         If use_structured_output is True: AgentResponse object
@@ -384,5 +403,6 @@ def extract_questions(
         model_name=model_name,
         api_key=api_key,
         use_structured_output=use_structured_output,
+        provider=provider,
     )
     return agent.chat(message)
