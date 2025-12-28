@@ -126,16 +126,6 @@ class QuestionExtractionAgent:
         #   - Remove analyze_image messages after save_questions_json
         #   - Remove save_questions_json messages after batch_process_images
         middleware = [
-           AnthropicPromptCachingMiddleware() if self.provider == "anthropic" else None,   
-           ContextEditingMiddleware(
-            edits=[
-                ClearToolUsesEdit(
-                    trigger=4096,
-                    keep=4,
-                    clear_tool_inputs=True
-                ),
-            ],
-          )
         ]
         
         # Create the agent using LangChain's create_agent

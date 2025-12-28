@@ -12,5 +12,5 @@ images
 
 *.jpg
 .env
-.env.*
+.env.local
 .langgraph_api/**
